@@ -1,13 +1,10 @@
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
+import { authConfig } from '@/auth.config';
 import { verifyCredentials } from '@/lib/auth/verify-credentials';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: 'jwt' },
-  trustHost: true,
-  pages: {
-    signIn: '/login',
-  },
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -22,18 +19,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.userId = user.id;
-      }
-      return token;
-    },
-    session({ session, token }) {
-      if (session.user && token.userId) {
-        session.user.id = token.userId;
-      }
-      return session;
-    },
-  },
 });
