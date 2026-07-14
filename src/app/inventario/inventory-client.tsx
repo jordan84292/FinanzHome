@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { ProductRow } from '@/components/inventory/ProductRow';
+import { ProductForm } from '@/components/inventory/ProductForm';
 import type { ProductCategoryRecord, ProductRecord, UnitOfMeasureRecord } from '@/lib/db/procedures/products';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
 
@@ -69,7 +70,13 @@ export function InventoryClient({
               <h2 className="h5 mb-0">{panel.mode === 'create' ? 'Nuevo producto' : 'Editar producto'}</h2>
               <button type="button" className="btn-close" onClick={() => setPanel(null)} aria-label="Cerrar" />
             </div>
-            {/* ProductForm is wired in Task 6 */}
+            <ProductForm
+              mode={panel.mode}
+              product={panel.mode === 'edit' ? panel.product : undefined}
+              categories={categories}
+              units={units}
+              currencies={currencies}
+            />
           </div>
         </div>
       ) : null}
