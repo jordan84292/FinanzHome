@@ -9,6 +9,7 @@ import {
   listProducts,
   listUnits,
   updateCurrentQuantity,
+  updateProduct,
 } from '@/lib/db/procedures/products';
 import { uniqueSuffix } from '../../helpers/db';
 
@@ -149,6 +150,43 @@ describe('product procedures', () => {
     await expect(updateCurrentQuantity(product.id, householdIdB, 3)).rejects.toThrow(
       /not found/i,
     );
+  });
+
+  it('rejects updating a product owned by a different household', async () => {
+    const suffixA = uniqueSuffix();
+    const suffixB = uniqueSuffix();
+    const { householdId: householdIdA, memberId: memberIdA } = await createMember(suffixA);
+    const { householdId: householdIdB } = await createMember(suffixB);
+    const [category] = await listCategories();
+    const [unit] = await listUnits();
+
+    const product = await createProduct({
+      householdId: householdIdA,
+      name: `Te ${suffixA}`,
+      categoryId: category.id,
+      unitId: unit.id,
+      optimalQuantity: 2,
+      currentQuantity: 1,
+      defaultPrice: null,
+      defaultPriceCurrencyId: null,
+      createdByMemberId: memberIdA,
+    });
+
+    // Household B must not be able to update the full record of a product that
+    // belongs to household A, even though it knows (or guessed) the product's
+    // numeric id (IDOR check) - mirrors the equivalent updateCurrentQuantity test.
+    await expect(
+      updateProduct({
+        productId: product.id,
+        householdId: householdIdB,
+        name: `Te renombrado ${suffixB}`,
+        categoryId: category.id,
+        unitId: unit.id,
+        optimalQuantity: 5,
+        defaultPrice: 100,
+        defaultPriceCurrencyId: null,
+      }),
+    ).rejects.toThrow(/not found/i);
   });
 
   it('deactivates a product so it no longer appears in the list', async () => {

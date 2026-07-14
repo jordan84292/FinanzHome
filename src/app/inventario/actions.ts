@@ -57,17 +57,21 @@ export async function createProductAction(
     return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos' };
   }
 
-  await createProduct({
-    householdId: membership.id,
-    name: parsed.data.name,
-    categoryId: parsed.data.categoryId,
-    unitId: parsed.data.unitId,
-    optimalQuantity: parsed.data.optimalQuantity,
-    currentQuantity: parsed.data.currentQuantity,
-    defaultPrice: parsed.data.defaultPrice ?? null,
-    defaultPriceCurrencyId: parsed.data.defaultPriceCurrencyId ?? null,
-    createdByMemberId: membership.member_id,
-  });
+  try {
+    await createProduct({
+      householdId: membership.id,
+      name: parsed.data.name,
+      categoryId: parsed.data.categoryId,
+      unitId: parsed.data.unitId,
+      optimalQuantity: parsed.data.optimalQuantity,
+      currentQuantity: parsed.data.currentQuantity,
+      defaultPrice: parsed.data.defaultPrice ?? null,
+      defaultPriceCurrencyId: parsed.data.defaultPriceCurrencyId ?? null,
+      createdByMemberId: membership.member_id,
+    });
+  } catch {
+    return { error: 'No se pudo guardar el producto. Verificá los datos e intentá de nuevo.' };
+  }
 
   revalidatePath('/inventario');
   return { error: null };
@@ -106,16 +110,20 @@ export async function updateProductAction(
     return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos' };
   }
 
-  await updateProduct({
-    productId: parsed.data.productId,
-    householdId: membership.id,
-    name: parsed.data.name,
-    categoryId: parsed.data.categoryId,
-    unitId: parsed.data.unitId,
-    optimalQuantity: parsed.data.optimalQuantity,
-    defaultPrice: parsed.data.defaultPrice ?? null,
-    defaultPriceCurrencyId: parsed.data.defaultPriceCurrencyId ?? null,
-  });
+  try {
+    await updateProduct({
+      productId: parsed.data.productId,
+      householdId: membership.id,
+      name: parsed.data.name,
+      categoryId: parsed.data.categoryId,
+      unitId: parsed.data.unitId,
+      optimalQuantity: parsed.data.optimalQuantity,
+      defaultPrice: parsed.data.defaultPrice ?? null,
+      defaultPriceCurrencyId: parsed.data.defaultPriceCurrencyId ?? null,
+    });
+  } catch {
+    return { error: 'No se pudo actualizar el producto. Es posible que ya no exista en tu hogar.' };
+  }
 
   revalidatePath('/inventario');
   return { error: null };
