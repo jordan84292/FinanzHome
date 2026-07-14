@@ -74,6 +74,7 @@ export async function createProduct(params: {
 
 export async function updateProduct(params: {
   productId: number;
+  householdId: number;
   name: string;
   categoryId: number;
   unitId: number;
@@ -83,6 +84,7 @@ export async function updateProduct(params: {
 }): Promise<ProductRecord> {
   const rows = await callProcedure<ProductRecord>('sp_product_update', [
     params.productId,
+    params.householdId,
     params.name,
     params.categoryId,
     params.unitId,
@@ -95,15 +97,17 @@ export async function updateProduct(params: {
 
 export async function updateCurrentQuantity(
   productId: number,
+  householdId: number,
   currentQuantity: number,
 ): Promise<ProductRecord> {
   const rows = await callProcedure<ProductRecord>('sp_product_update_current_quantity', [
     productId,
+    householdId,
     currentQuantity,
   ]);
   return rows[0];
 }
 
-export async function deactivateProduct(productId: number): Promise<void> {
-  await callProcedure('sp_product_deactivate', [productId]);
+export async function deactivateProduct(productId: number, householdId: number): Promise<void> {
+  await callProcedure('sp_product_deactivate', [productId, householdId]);
 }

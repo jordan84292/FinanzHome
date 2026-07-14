@@ -2,11 +2,19 @@ DROP PROCEDURE IF EXISTS sp_product_update_current_quantity;
 
 CREATE PROCEDURE sp_product_update_current_quantity(
   IN p_product_id INT UNSIGNED,
+  IN p_household_id INT UNSIGNED,
   IN p_current_quantity DECIMAL(10,2)
 )
 BEGIN
+  DECLARE v_exists INT;
+
   IF p_current_quantity < 0 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Current quantity cannot be negative';
+  END IF;
+
+  SELECT COUNT(*) INTO v_exists FROM products WHERE id = p_product_id AND household_id = p_household_id;
+  IF v_exists = 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Product not found in this household';
   END IF;
 
   UPDATE products SET current_quantity = p_current_quantity WHERE id = p_product_id;

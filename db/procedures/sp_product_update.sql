@@ -2,6 +2,7 @@ DROP PROCEDURE IF EXISTS sp_product_update;
 
 CREATE PROCEDURE sp_product_update(
   IN p_product_id INT UNSIGNED,
+  IN p_household_id INT UNSIGNED,
   IN p_name VARCHAR(150),
   IN p_category_id SMALLINT UNSIGNED,
   IN p_unit_id SMALLINT UNSIGNED,
@@ -10,6 +11,13 @@ CREATE PROCEDURE sp_product_update(
   IN p_default_price_currency_id TINYINT UNSIGNED
 )
 BEGIN
+  DECLARE v_exists INT;
+
+  SELECT COUNT(*) INTO v_exists FROM products WHERE id = p_product_id AND household_id = p_household_id;
+  IF v_exists = 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Product not found in this household';
+  END IF;
+
   UPDATE products
   SET name = p_name,
       category_id = p_category_id,

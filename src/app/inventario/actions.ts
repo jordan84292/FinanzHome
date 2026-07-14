@@ -18,7 +18,7 @@ export async function requireMembership(): Promise<HouseholdForUserRecord> {
 }
 
 export async function updateCurrentQuantityAction(productId: number, quantity: number): Promise<void> {
-  await requireMembership();
-  await updateCurrentQuantity(productId, Math.max(0, quantity));
+  const membership = await requireMembership();
+  await updateCurrentQuantity(productId, membership.id, Math.max(0, quantity));
   revalidatePath('/inventario');
 }

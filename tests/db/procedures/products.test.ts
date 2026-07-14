@@ -93,7 +93,7 @@ describe('product procedures', () => {
       createdByMemberId: memberId,
     });
 
-    const updated = await updateCurrentQuantity(product.id, 3);
+    const updated = await updateCurrentQuantity(product.id, householdId, 3);
     expect(updated.current_quantity).toBe(3);
     expect(updated.optimal_quantity).toBe(4);
   });
@@ -119,8 +119,35 @@ describe('product procedures', () => {
     // Assert on the specific SIGNALed message, not just "some error was thrown" -
     // this is what proves the SP's own negative-quantity guard fired (SQLSTATE 45000),
     // rather than some unrelated error (e.g. a coercion/validation failure upstream).
-    await expect(updateCurrentQuantity(product.id, -1)).rejects.toThrow(
+    await expect(updateCurrentQuantity(product.id, householdId, -1)).rejects.toThrow(
       /Current quantity cannot be negative/,
+    );
+  });
+
+  it('rejects updating current quantity for a product owned by a different household', async () => {
+    const suffixA = uniqueSuffix();
+    const suffixB = uniqueSuffix();
+    const { householdId: householdIdA, memberId: memberIdA } = await createMember(suffixA);
+    const { householdId: householdIdB } = await createMember(suffixB);
+    const [category] = await listCategories();
+    const [unit] = await listUnits();
+
+    const product = await createProduct({
+      householdId: householdIdA,
+      name: `Cafe ${suffixA}`,
+      categoryId: category.id,
+      unitId: unit.id,
+      optimalQuantity: 2,
+      currentQuantity: 1,
+      defaultPrice: null,
+      defaultPriceCurrencyId: null,
+      createdByMemberId: memberIdA,
+    });
+
+    // Household B must not be able to mutate a product that belongs to household A,
+    // even though it knows (or guessed) the product's numeric id (IDOR check).
+    await expect(updateCurrentQuantity(product.id, householdIdB, 3)).rejects.toThrow(
+      /not found/i,
     );
   });
 
@@ -142,7 +169,7 @@ describe('product procedures', () => {
       createdByMemberId: memberId,
     });
 
-    await deactivateProduct(product.id);
+    await deactivateProduct(product.id, householdId);
 
     const products = await listProducts(householdId);
     expect(products.map((p) => p.id)).not.toContain(product.id);
