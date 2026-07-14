@@ -4,10 +4,16 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 import './globals.css';
 import { Providers } from './providers';
 import { BottomNav } from '@/components/BottomNav';
+import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 
 export const metadata: Metadata = {
   title: 'FinanzHome',
   description: 'Inventario, compras y finanzas del hogar',
+  manifest: '/manifest.json',
+};
+
+export const viewport = {
+  themeColor: '#0d6efd',
 };
 
 export default function RootLayout({
@@ -21,6 +27,7 @@ export default function RootLayout({
         <Providers>
           {children}
           <BottomNav />
+          <ServiceWorkerRegister />
         </Providers>
       </body>
     </html>
