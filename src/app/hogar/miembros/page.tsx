@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { inviteMemberAction, type InviteActionState } from './actions';
 
-const initialState: InviteActionState = { error: null, success: false };
+const initialState: InviteActionState = { error: null, success: false, emailSent: false };
 
 export default function HouseholdMembersPage() {
   const [state, formAction, pending] = useActionState(inviteMemberAction, initialState);
@@ -23,7 +23,9 @@ export default function HouseholdMembersPage() {
         ) : null}
         {state.success ? (
           <div className="alert alert-success py-2 mb-0" role="alert">
-            Invitación enviada.
+            {state.emailSent
+              ? 'Invitación enviada.'
+              : 'Invitación creada, pero no pudimos enviar el correo. Compartí el enlace manualmente.'}
           </div>
         ) : null}
         <button type="submit" className="btn btn-primary" disabled={pending}>

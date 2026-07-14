@@ -10,7 +10,7 @@ export async function inviteHouseholdMember(params: {
   email: string;
   invitedByMemberId: number;
   appUrl: string;
-}): Promise<void> {
+}): Promise<{ emailSent: boolean }> {
   const token = randomBytes(24).toString('hex');
   const expiresAt = new Date(Date.now() + INVITATION_TTL_DAYS * 24 * 60 * 60 * 1000);
 
@@ -22,9 +22,15 @@ export async function inviteHouseholdMember(params: {
     expiresAt,
   });
 
-  await sendInvitationEmail({
-    to: params.email,
-    householdName: params.householdName,
-    inviteUrl: `${params.appUrl}/onboarding?invite=${token}`,
-  });
+  try {
+    await sendInvitationEmail({
+      to: params.email,
+      householdName: params.householdName,
+      inviteUrl: `${params.appUrl}/onboarding?invite=${token}`,
+    });
+    return { emailSent: true };
+  } catch (error) {
+    console.error('Error al enviar el correo de invitación:', error);
+    return { emailSent: false };
+  }
 }

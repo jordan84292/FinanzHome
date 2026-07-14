@@ -5,10 +5,14 @@ export async function sendInvitationEmail(params: {
   householdName: string;
   inviteUrl: string;
 }): Promise<void> {
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: 'FinanzHome <onboarding@resend.dev>',
     to: params.to,
     subject: `Te invitaron a ${params.householdName} en FinanzHome`,
     html: `<p>Te invitaron a unirte a <strong>${params.householdName}</strong> en FinanzHome.</p><p><a href="${params.inviteUrl}">Aceptar invitación</a></p>`,
   });
+
+  if (error) {
+    throw new Error(`Resend no pudo enviar el correo de invitación: ${error.name} - ${error.message}`);
+  }
 }
