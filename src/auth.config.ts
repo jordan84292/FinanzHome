@@ -12,6 +12,9 @@ export const authConfig = {
   },
   providers: [],
   callbacks: {
+    authorized({ auth }) {
+      return Boolean(auth?.user);
+    },
     jwt({ token, user }) {
       if (user) {
         token.userId = user.id;
