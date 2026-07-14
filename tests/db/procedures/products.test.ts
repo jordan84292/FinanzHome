@@ -1,6 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { createCategory, listCategories, listUnits } from '@/lib/db/procedures/products';
+import { registerUser } from '@/lib/db/procedures/auth';
+import { createHousehold, getHouseholdsForUser } from '@/lib/db/procedures/household';
+import {
+  createCategory,
+  createProduct,
+  deactivateProduct,
+  listCategories,
+  listProducts,
+  listUnits,
+  updateCurrentQuantity,
+} from '@/lib/db/procedures/products';
 import { uniqueSuffix } from '../../helpers/db';
+
+async function createMember(suffix: string): Promise<{ householdId: number; memberId: number }> {
+  const user = await registerUser({
+    email: `product_owner_${suffix}@example.com`,
+    passwordHash: 'hash',
+    name: 'Owner',
+  });
+  const household = await createHousehold({
+    name: `Casa ${suffix}`,
+    creatorUserId: user.id,
+    creatorDisplayName: 'Owner',
+    creatorPaymentDay: 5,
+  });
+  const [membership] = await getHouseholdsForUser(user.id);
+  return { householdId: household.id, memberId: membership.member_id };
+}
 
 describe('product catalog procedures', () => {
   it('lists the seeded categories', async () => {
@@ -20,5 +46,105 @@ describe('product catalog procedures', () => {
 
     const categories = await listCategories();
     expect(categories.map((c) => c.id)).toContain(created.id);
+  });
+});
+
+describe('product procedures', () => {
+  it('creates a product and lists it scoped to its household', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const [category] = await listCategories();
+    const [unit] = await listUnits();
+
+    const product = await createProduct({
+      householdId,
+      name: `Arroz ${suffix}`,
+      categoryId: category.id,
+      unitId: unit.id,
+      optimalQuantity: 2,
+      currentQuantity: 0,
+      defaultPrice: 1500,
+      defaultPriceCurrencyId: null,
+      createdByMemberId: memberId,
+    });
+
+    expect(product.name).toBe(`Arroz ${suffix}`);
+    expect(product.category_name).toBe(category.name);
+
+    const products = await listProducts(householdId);
+    expect(products.map((p) => p.id)).toContain(product.id);
+  });
+
+  it('updates current quantity independently of the other fields', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const [category] = await listCategories();
+    const [unit] = await listUnits();
+
+    const product = await createProduct({
+      householdId,
+      name: `Leche ${suffix}`,
+      categoryId: category.id,
+      unitId: unit.id,
+      optimalQuantity: 4,
+      currentQuantity: 1,
+      defaultPrice: null,
+      defaultPriceCurrencyId: null,
+      createdByMemberId: memberId,
+    });
+
+    const updated = await updateCurrentQuantity(product.id, 3);
+    expect(updated.current_quantity).toBe(3);
+    expect(updated.optimal_quantity).toBe(4);
+  });
+
+  it('rejects a negative current quantity', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const [category] = await listCategories();
+    const [unit] = await listUnits();
+
+    const product = await createProduct({
+      householdId,
+      name: `Yogur ${suffix}`,
+      categoryId: category.id,
+      unitId: unit.id,
+      optimalQuantity: 2,
+      currentQuantity: 1,
+      defaultPrice: null,
+      defaultPriceCurrencyId: null,
+      createdByMemberId: memberId,
+    });
+
+    // Assert on the specific SIGNALed message, not just "some error was thrown" -
+    // this is what proves the SP's own negative-quantity guard fired (SQLSTATE 45000),
+    // rather than some unrelated error (e.g. a coercion/validation failure upstream).
+    await expect(updateCurrentQuantity(product.id, -1)).rejects.toThrow(
+      /Current quantity cannot be negative/,
+    );
+  });
+
+  it('deactivates a product so it no longer appears in the list', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const [category] = await listCategories();
+    const [unit] = await listUnits();
+
+    const product = await createProduct({
+      householdId,
+      name: `Jabón ${suffix}`,
+      categoryId: category.id,
+      unitId: unit.id,
+      optimalQuantity: 1,
+      currentQuantity: 1,
+      defaultPrice: null,
+      defaultPriceCurrencyId: null,
+      createdByMemberId: memberId,
+    });
+
+    await deactivateProduct(product.id);
+
+    const products = await listProducts(householdId);
+    expect(products.map((p) => p.id)).not.toContain(product.id);
   });
 });
