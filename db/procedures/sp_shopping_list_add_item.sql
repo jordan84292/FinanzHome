@@ -20,6 +20,14 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Shopping list not found or not open';
   END IF;
 
+  SELECT COUNT(*) INTO v_exists
+  FROM products
+  WHERE id = p_product_id AND household_id = p_household_id AND is_active = 1;
+
+  IF v_exists = 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Product not found in this household';
+  END IF;
+
   INSERT INTO shopping_list_items (shopping_list_id, product_id, quantity_needed, unit_price, unit_price_currency_id, is_extra)
   VALUES (p_shopping_list_id, p_product_id, p_quantity_needed, p_unit_price, p_unit_price_currency_id, p_is_extra);
 

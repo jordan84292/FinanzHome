@@ -225,6 +225,39 @@ describe('shopping list item edit procedures', () => {
       }),
     ).rejects.toThrow(/not found/i);
   });
+
+  it('rejects adding an item whose product belongs to a different household', async () => {
+    const suffixA = uniqueSuffix();
+    const suffixB = uniqueSuffix();
+    const { householdId: householdIdA, memberId: memberIdA } = await createMember(suffixA);
+    const { householdId: householdIdB, memberId: memberIdB } = await createMember(suffixB);
+    const [category] = await listCategories();
+    const [unit] = await listUnits();
+    const productA = await createProduct({
+      householdId: householdIdA,
+      name: `Naranjas ${suffixA}`,
+      categoryId: category.id,
+      unitId: unit.id,
+      optimalQuantity: 3,
+      currentQuantity: 0,
+      defaultPrice: null,
+      defaultPriceCurrencyId: null,
+      createdByMemberId: memberIdA,
+    });
+    const listB = await generateOrGetShoppingList(householdIdB, memberIdB);
+
+    await expect(
+      addShoppingListItem({
+        shoppingListId: listB.id,
+        householdId: householdIdB,
+        productId: productA.id,
+        quantityNeeded: 2,
+        unitPrice: null,
+        unitPriceCurrencyId: null,
+        isExtra: true,
+      }),
+    ).rejects.toThrow(/not found in this household/i);
+  });
 });
 
 describe('shopping list confirm procedure', () => {
