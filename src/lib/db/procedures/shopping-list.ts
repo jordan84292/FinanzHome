@@ -28,11 +28,18 @@ export interface ShoppingListItemRecord extends RowDataPacket {
   quantity_needed: number;
   unit_price: number | null;
   unit_price_currency_id: number | null;
-  unit_price_currency_code: string | null;
-  unit_price_currency_symbol: string | null;
   is_extra: number;
   is_purchased: number;
-  subtotal_in_display_currency: number | null;
+  /**
+   * Only populated by sp_shopping_list_items_get (needs the exchange-rate
+   * lookup + currencies join). sp_shopping_list_add_item and
+   * sp_shopping_list_item_update return the row without these — callers
+   * of addShoppingListItem/updateShoppingListItem must not read them;
+   * re-fetch via getShoppingListItems() for the full detail.
+   */
+  unit_price_currency_code?: string | null;
+  unit_price_currency_symbol?: string | null;
+  subtotal_in_display_currency?: number | null;
 }
 
 export async function generateOrGetShoppingList(
