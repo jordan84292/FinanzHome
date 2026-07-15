@@ -10,7 +10,13 @@ export interface ShoppingListRecord extends RowDataPacket {
   total_estimated_currency_id: number | null;
   created_at: string;
   confirmed_at: string | null;
-  total_estimated_live: number | null;
+  /**
+   * Only populated by sp_shopping_list_get's correlated subquery.
+   * sp_shopping_list_generate's result does not include this column —
+   * callers of generateOrGetShoppingList must not read it; fetch the
+   * full detail via getShoppingList() instead.
+   */
+  total_estimated_live?: number | null;
 }
 
 export interface ShoppingListItemRecord extends RowDataPacket {
