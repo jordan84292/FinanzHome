@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ShoppingListItemRow } from '@/components/shopping-list/ShoppingListItemRow';
 import { ShoppingListItemForm } from '@/components/shopping-list/ShoppingListItemForm';
+import { ConfirmPurchaseButton } from './confirm-purchase-button';
 import type { ProductRecord } from '@/lib/db/procedures/products';
 import type { ShoppingListItemRecord, ShoppingListRecord } from '@/lib/db/procedures/shopping-list';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
@@ -77,7 +78,7 @@ export function ShoppingListClient({
               {list.total_estimated_live ?? 0}
             </div>
           </div>
-          {/* ConfirmPurchaseButton is wired in Task 6 */}
+          <ConfirmPurchaseButton shoppingListId={list.id} />
         </div>
       ) : null}
     </main>

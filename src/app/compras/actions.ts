@@ -5,7 +5,9 @@ import { z } from 'zod';
 import { requireMembership } from '@/lib/household/require-membership';
 import {
   addShoppingListItem,
+  confirmShoppingList,
   deleteShoppingListItem,
+  getShoppingListItems,
   updateShoppingListItem,
 } from '@/lib/db/procedures/shopping-list';
 
@@ -103,4 +105,38 @@ export async function deleteItemAction(itemId: number): Promise<void> {
   const membership = await requireMembership();
   await deleteShoppingListItem(itemId, membership.id);
   revalidatePath('/compras');
+}
+
+const DISPLAY_CURRENCY_ID = 1; // CRC — matches page.tsx's constant; see Global Constraints
+
+export interface ConfirmPurchaseState {
+  error: string | null;
+}
+
+export async function confirmPurchaseAction(shoppingListId: number): Promise<ConfirmPurchaseState> {
+  const membership = await requireMembership();
+
+  const items = await getShoppingListItems(shoppingListId, membership.id, DISPLAY_CURRENCY_ID);
+  if (items.length === 0) {
+    return { error: 'La lista está vacía' };
+  }
+
+  try {
+    await confirmShoppingList({
+      shoppingListId,
+      householdId: membership.id,
+      items: items.map((item) => ({
+        itemId: item.id,
+        quantity: item.quantity_needed,
+        unitPrice: item.unit_price,
+        unitPriceCurrencyId: item.unit_price_currency_id,
+      })),
+      displayCurrencyId: DISPLAY_CURRENCY_ID,
+    });
+  } catch {
+    return { error: 'No se pudo confirmar la compra. Intentá de nuevo.' };
+  }
+
+  revalidatePath('/compras');
+  return { error: null };
 }
