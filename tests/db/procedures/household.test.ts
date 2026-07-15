@@ -21,7 +21,6 @@ describe('household procedures', () => {
       name: `Casa ${suffix}`,
       creatorUserId: user.id,
       creatorDisplayName: 'Owner',
-      creatorPaymentDay: 15,
     });
 
     const memberships = await getHouseholdsForUser(user.id);
@@ -41,7 +40,6 @@ describe('household procedures', () => {
       name: `Casa ${suffix}`,
       creatorUserId: owner.id,
       creatorDisplayName: 'Owner',
-      creatorPaymentDay: 15,
     });
     const [ownerMembership] = await getHouseholdsForUser(owner.id);
 
@@ -63,7 +61,6 @@ describe('household procedures', () => {
       token: invitation.token,
       userId: invitee.id,
       displayName: 'Invitee',
-      paymentDay: 1,
     });
 
     const membershipsAfter = await getHouseholdsForUser(invitee.id);
@@ -83,7 +80,6 @@ describe('household procedures', () => {
       name: `Casa ${suffix}`,
       creatorUserId: owner.id,
       creatorDisplayName: 'Owner',
-      creatorPaymentDay: 15,
     });
     const [ownerMembership] = await getHouseholdsForUser(owner.id);
     const invitee = await registerUser({
@@ -103,7 +99,6 @@ describe('household procedures', () => {
       token: invitation.token,
       userId: invitee.id,
       displayName: 'Invitee',
-      paymentDay: 1,
     });
 
     await expect(
@@ -111,7 +106,6 @@ describe('household procedures', () => {
         token: invitation.token,
         userId: invitee.id,
         displayName: 'Invitee',
-        paymentDay: 1,
       }),
     ).rejects.toThrow();
   });

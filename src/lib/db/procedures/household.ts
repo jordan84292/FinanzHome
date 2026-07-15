@@ -22,7 +22,6 @@ export interface HouseholdMemberRecord extends RowDataPacket {
   household_id: number;
   user_id: number;
   display_name: string;
-  payment_day: number;
   role: 'owner' | 'member';
   joined_at: string;
 }
@@ -33,7 +32,6 @@ export interface HouseholdForUserRecord extends RowDataPacket {
   created_at: string;
   member_id: number;
   display_name: string;
-  payment_day: number;
   role: 'owner' | 'member';
 }
 
@@ -41,13 +39,11 @@ export async function createHousehold(params: {
   name: string;
   creatorUserId: number;
   creatorDisplayName: string;
-  creatorPaymentDay: number;
 }): Promise<HouseholdRecord> {
   const rows = await callProcedure<HouseholdRecord>('sp_household_create', [
     params.name,
     params.creatorUserId,
     params.creatorDisplayName,
-    params.creatorPaymentDay,
   ]);
   return rows[0];
 }
@@ -73,13 +69,11 @@ export async function acceptInvitation(params: {
   token: string;
   userId: number;
   displayName: string;
-  paymentDay: number;
 }): Promise<HouseholdMemberRecord> {
   const rows = await callProcedure<HouseholdMemberRecord>('sp_household_invitation_accept', [
     params.token,
     params.userId,
     params.displayName,
-    params.paymentDay,
   ]);
   return rows[0];
 }
