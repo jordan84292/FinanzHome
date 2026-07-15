@@ -799,10 +799,10 @@ BEGIN
   SET v_len = JSON_LENGTH(p_items_json);
 
   WHILE v_i < v_len DO
-    SET v_item_id = CAST(JSON_EXTRACT(p_items_json, CONCAT('$[', v_i, '].itemId')) AS UNSIGNED);
-    SET v_quantity = CAST(JSON_EXTRACT(p_items_json, CONCAT('$[', v_i, '].quantity')) AS DECIMAL(10,2));
-    SET v_unit_price = CAST(JSON_EXTRACT(p_items_json, CONCAT('$[', v_i, '].unitPrice')) AS DECIMAL(12,2));
-    SET v_unit_price_currency_id = CAST(JSON_EXTRACT(p_items_json, CONCAT('$[', v_i, '].unitPriceCurrencyId')) AS UNSIGNED);
+    SET v_item_id = CAST(JSON_VALUE(p_items_json, CONCAT('$[', v_i, '].itemId')) AS UNSIGNED);
+    SET v_quantity = CAST(JSON_VALUE(p_items_json, CONCAT('$[', v_i, '].quantity')) AS DECIMAL(10,2));
+    SET v_unit_price = CAST(JSON_VALUE(p_items_json, CONCAT('$[', v_i, '].unitPrice')) AS DECIMAL(12,2));
+    SET v_unit_price_currency_id = CAST(JSON_VALUE(p_items_json, CONCAT('$[', v_i, '].unitPriceCurrencyId')) AS UNSIGNED);
 
     SET v_product_id = NULL;
     SELECT product_id INTO v_product_id
@@ -849,7 +849,9 @@ BEGIN
   WHERE id = p_shopping_list_id;
 END;
 ```
-This is the flagged MariaDB-compatibility case from the master plan: `JSON_LENGTH` + `WHILE` + `JSON_EXTRACT` per array element, with explicit `CAST(... AS UNSIGNED/DECIMAL)` on each extracted scalar (a bare `JSON_EXTRACT` result is a JSON value, not a SQL number — the `CAST` is required, not decorative). No `JSON_TABLE` anywhere (unavailable until MariaDB 10.6). The per-item "does this item genuinely belong to this list" check (`v_product_id IS NULL` after the lookup) is a second layer of the same household-scoping discipline — even though `p_shopping_list_id` was already verified to belong to `p_household_id` above, a malformed/tampered `itemId` in the JSON payload pointing at a different list's item is still caught here before it can bump the wrong product's inventory.
+This is the flagged MariaDB-compatibility case from the master plan: `JSON_LENGTH` + `WHILE` + `JSON_VALUE` per array element, with explicit `CAST(... AS UNSIGNED/DECIMAL)` on each extracted scalar (a bare `JSON_VALUE`/`JSON_EXTRACT` result is a JSON value, not a SQL number — the `CAST` is required, not decorative). No `JSON_TABLE` anywhere (unavailable until MariaDB 10.6). The per-item "does this item genuinely belong to this list" check (`v_product_id IS NULL` after the lookup) is a second layer of the same household-scoping discipline — even though `p_shopping_list_id` was already verified to belong to `p_household_id` above, a malformed/tampered `itemId` in the JSON payload pointing at a different list's item is still caught here before it can bump the wrong product's inventory.
+
+**Real MariaDB gotcha confirmed during implementation of this task — use `JSON_VALUE`, not `JSON_EXTRACT`, for scalar extraction with `CAST`:** `CAST(JSON_EXTRACT(json, path) AS UNSIGNED)` silently produces `0` (not SQL `NULL`) when the JSON value at that path is `null` — `JSON_EXTRACT` returns the JSON-typed value (the literal 4-character JSON `null`, which stringifies to `'null'` and casts to `0`), not a SQL NULL passthrough. This matters here because `unit_price`/`unit_price_currency_id` are legitimately nullable (a product with no price yet), and a silent `0` for `unit_price_currency_id` trips the `fk_shopping_list_items_currency` foreign key (no currency has id `0`). `JSON_VALUE(json, path)` is the correct function for extracting a single SQL scalar from JSON and correctly passes through SQL `NULL` for a JSON `null`, while extracting non-null scalars identically to `JSON_EXTRACT`. Use `JSON_VALUE` for any future JSON+WHILE scalar extraction in this project where a field can legitimately be `NULL` — which, given this project's nullable-price/nullable-currency design throughout, is most of them.
 
 Run: `npm run db:migrate` — expected: procedure loads.
 

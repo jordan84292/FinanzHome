@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - **DB-first, sin ORM:** toda regla de negocio (faltantes de inventario, divisiones de gasto, vencimientos, recordatorios, agregados de dashboard) vive en stored procedures. El backend solo hace `CALL sp_xxx(...)`.
-- **MariaDB 10.4.32:** no usar `JSON_TABLE` (llega recién en MariaDB 10.6). Cualquier array JSON que deba procesarse dentro de un SP se recorre con `JSON_LENGTH` + `WHILE` + `JSON_EXTRACT(json, CONCAT('$[',i,']'))`. Ver sección "Patrón JSON+WHILE" más abajo.
+- **MariaDB 10.4.32:** no usar `JSON_TABLE` (llega recién en MariaDB 10.6). Cualquier array JSON que deba procesarse dentro de un SP se recorre con `JSON_LENGTH` + `WHILE` + `JSON_VALUE(json, CONCAT('$[',i,'].campo'))` para escalares (no `JSON_EXTRACT` — convierte `null` de JSON en `0`/`''` en vez de `NULL` de SQL al castear, confirmado como bug real en Fase 2). Ver sección "Patrón JSON+WHILE" más abajo.
 - **Mobile-first real:** cada pantalla se diseña primero para el ancho de un celular (~360–420px) con Bootstrap 5 grid/utilities; el layout desktop es una expansión, no el punto de partida.
 - **PWA como entrega principal:** instalable, ícono propio, funcionamiento offline básico de la lista de compras (el caso de uso ancla: celular sin señal, adentro del supermercado).
 - **Un solo hogar (no multi-tenant):** varios `household_members` comparten un `household_id`. Aun así, todo SP recibe `household_id`/`member_id` y valida pertenencia — es barato ahora y evita fugas de datos si el modelo cambia después.
@@ -62,14 +62,15 @@ Se presenta entero acá porque varias tablas se referencian entre fases; cada fa
 
 ### Patrón JSON+WHILE (el caso MariaDB-flagged)
 
-El único punto donde de verdad hace falta pasar un array variable a un SP es **confirmar una compra** (10–50 ítems de una sola vez, de forma atómica). Ahí se pasa un `JSON_ARRAY` como parámetro y el SP lo recorre así (descripción, no código):
+El único punto donde de verdad hace falta pasar un array variable a un SP es **confirmar una compra** (10–50 ítems de una sola vez, de forma atómica) — implementado en Fase 2. Ahí se pasa un `JSON_ARRAY` como parámetro y el SP lo recorre así (descripción, no código):
 1. `SET v_len = JSON_LENGTH(p_items_json)`
 2. `WHILE v_i < v_len DO`
-3. `SET v_item = JSON_EXTRACT(p_items_json, CONCAT('$[', v_i, ']'))`
-4. extraer campos con `JSON_EXTRACT(v_item, '$.product_id')`, etc.
-5. `INSERT`/`UPDATE` fila por fila, `SET v_i = v_i + 1`, `END WHILE`
+3. extraer cada campo escalar con `CAST(JSON_VALUE(p_items_json, CONCAT('$[', v_i, '].campo')) AS TIPO)` — **usar `JSON_VALUE`, no `JSON_EXTRACT`**, ver nota de compatibilidad abajo
+4. `INSERT`/`UPDATE` fila por fila, `SET v_i = v_i + 1`, `END WHILE`
 
 Es portable a MySQL 8+ también, así que no se pierde nada por evitar `JSON_TABLE`.
+
+**Gotcha real de MariaDB, confirmado al implementar Fase 2:** `CAST(JSON_EXTRACT(json, path) AS UNSIGNED/DECIMAL)` convierte un `null` de JSON en `0`, no en `NULL` de SQL — `JSON_EXTRACT` devuelve el valor con tipo JSON (el `null` literal, que al castear a numérico da `0`), no un NULL de SQL real. Esto rompe cualquier campo legítimamente nulleable (precio sin cargar, moneda sin definir) pasado por este patrón — en Fase 2 causó una violación de FK real (`unit_price_currency_id = 0` en vez de `NULL`). **`JSON_VALUE(json, path)` es la función correcta**: extrae un escalar SQL y pasa `NULL` correctamente cuando el valor JSON es `null`, con el mismo comportamiento que `JSON_EXTRACT` para valores no nulos. Usar `JSON_VALUE` (no `JSON_EXTRACT`) en cualquier extracción escalar dentro de un patrón JSON+WHILE futuro.
 
 Para los demás casos "N filas variables" (splits de compra, % de gasto compartido), **N es chico** (cantidad de miembros del hogar, típicamente 2–6): en vez de JSON+WHILE se prefiere que el wrapper TS haga una llamada al SP por miembro dentro de una misma transacción (`pool.getConnection()` + `beginTransaction`/`commit`). Es más simple de leer y depurar sin ganar nada evitándolo.
 
