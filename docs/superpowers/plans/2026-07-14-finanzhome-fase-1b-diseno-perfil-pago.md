@@ -816,6 +816,16 @@ For each of `src/app/login/page.tsx`, `src/app/register/page.tsx`, `src/app/hoga
 
 This step is intentionally light-touch: the point of Task 1's CSS-variable approach is that most of this "just works" once the tokens are in place. Don't invent new layout structure here — only fix spots where a class bypasses the token system (hardcoded hex colors, `btn-secondary` where `btn-primary` was intended, etc.). If a page has no such spots, say so in the report rather than making unnecessary changes.
 
+- [ ] **Step 2b: Fix the PWA theme-color (flagged during Task 1, deferred here)**
+
+Modify `src/app/layout.tsx` — the `viewport` export's `themeColor` still hardcodes Bootstrap's original blue (`#0d6efd`) from the Fase 0b PWA task, predating this whole redesign. Update it to the new dark background color so the OS/browser chrome (address bar tint, task switcher card) matches the app instead of clashing with it:
+```ts
+export const viewport = {
+  themeColor: '#1E1B3A',
+};
+```
+(If the current value or export shape differs from this guess, read the file first and adjust the one color value only — don't restructure the `viewport`/`metadata` exports otherwise.)
+
 - [ ] **Step 3: Manual verification (visual, across all touched pages)**
 
 Run: `npm run dev`. Using a real session cookie, visit `/login`, `/register`, `/hogar/miembros`, and `/inventario` (with at least one low-stock product present — reuse or create one via the established script technique) via curl, and for `/inventario` specifically confirm the low-stock row's HTML now contains `border-left` / the warning CSS variables in its inline `style` attribute rather than `bg-warning-subtle` in its `class`. For the others, confirm no hardcoded Bootstrap-default color classes (`btn-secondary`, raw hex colors) remain anywhere in the rendered HTML of forms/buttons that should carry the new primary color. Stop the dev server and clean up any throwaway scripts when done.

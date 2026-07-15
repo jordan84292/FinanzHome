@@ -65,7 +65,7 @@ export function InventoryClient({
           className="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex align-items-end"
           style={{ zIndex: 1050 }}
         >
-          <div className="bg-body w-100 p-3 rounded-top" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+          <div className="bg-body w-100 p-3 rounded-top-4" style={{ maxHeight: '85vh', overflowY: 'auto' }}>
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h2 className="h5 mb-0">{panel.mode === 'create' ? 'Nuevo producto' : 'Editar producto'}</h2>
               <button type="button" className="btn-close" onClick={() => setPanel(null)} aria-label="Cerrar" />

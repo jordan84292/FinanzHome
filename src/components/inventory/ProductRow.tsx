@@ -27,9 +27,15 @@ export function ProductRow({
 
   return (
     <li
-      className={`list-group-item d-flex justify-content-between align-items-center ${
-        isLow ? 'bg-warning-subtle' : ''
-      }`}
+      className="list-group-item d-flex justify-content-between align-items-center"
+      style={
+        isLow
+          ? {
+              borderLeft: '4px solid var(--bs-warning)',
+              backgroundColor: 'var(--bs-warning-bg-subtle)',
+            }
+          : undefined
+      }
     >
       <button
         type="button"
