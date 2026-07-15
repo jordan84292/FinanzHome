@@ -19,7 +19,6 @@ async function createMember(suffix: string): Promise<number> {
     name: `Casa ${suffix}`,
     creatorUserId: user.id,
     creatorDisplayName: 'Member',
-    creatorPaymentDay: 10,
   });
   const [membership] = await getHouseholdsForUser(user.id);
   return membership.member_id;

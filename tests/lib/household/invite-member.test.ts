@@ -26,7 +26,6 @@ describe('inviteHouseholdMember', () => {
       name: `Casa ${suffix}`,
       creatorUserId: owner.id,
       creatorDisplayName: 'Owner',
-      creatorPaymentDay: 10,
     });
     const [membership] = await getHouseholdsForUser(owner.id);
 
@@ -56,7 +55,6 @@ describe('inviteHouseholdMember', () => {
       name: `Casa ${suffix}`,
       creatorUserId: owner.id,
       creatorDisplayName: 'Owner',
-      creatorPaymentDay: 10,
     });
     const [membership] = await getHouseholdsForUser(owner.id);
     const inviteeEmail = `invitee_fail_${suffix}@example.com`;
