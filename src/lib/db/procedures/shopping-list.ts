@@ -70,3 +70,45 @@ export async function getShoppingListItems(
     displayCurrencyId,
   ]);
 }
+
+export async function addShoppingListItem(params: {
+  shoppingListId: number;
+  householdId: number;
+  productId: number;
+  quantityNeeded: number;
+  unitPrice: number | null;
+  unitPriceCurrencyId: number | null;
+  isExtra: boolean;
+}): Promise<ShoppingListItemRecord> {
+  const rows = await callProcedure<ShoppingListItemRecord>('sp_shopping_list_add_item', [
+    params.shoppingListId,
+    params.householdId,
+    params.productId,
+    params.quantityNeeded,
+    params.unitPrice,
+    params.unitPriceCurrencyId,
+    params.isExtra ? 1 : 0,
+  ]);
+  return rows[0];
+}
+
+export async function updateShoppingListItem(params: {
+  itemId: number;
+  householdId: number;
+  quantityNeeded: number;
+  unitPrice: number | null;
+  unitPriceCurrencyId: number | null;
+}): Promise<ShoppingListItemRecord> {
+  const rows = await callProcedure<ShoppingListItemRecord>('sp_shopping_list_item_update', [
+    params.itemId,
+    params.householdId,
+    params.quantityNeeded,
+    params.unitPrice,
+    params.unitPriceCurrencyId,
+  ]);
+  return rows[0];
+}
+
+export async function deleteShoppingListItem(itemId: number, householdId: number): Promise<void> {
+  await callProcedure('sp_shopping_list_item_delete', [itemId, householdId]);
+}
