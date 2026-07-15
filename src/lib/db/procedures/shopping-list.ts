@@ -119,3 +119,23 @@ export async function updateShoppingListItem(params: {
 export async function deleteShoppingListItem(itemId: number, householdId: number): Promise<void> {
   await callProcedure('sp_shopping_list_item_delete', [itemId, householdId]);
 }
+
+export async function confirmShoppingList(params: {
+  shoppingListId: number;
+  householdId: number;
+  items: Array<{
+    itemId: number;
+    quantity: number;
+    unitPrice: number | null;
+    unitPriceCurrencyId: number | null;
+  }>;
+  displayCurrencyId: number;
+}): Promise<ShoppingListRecord> {
+  const rows = await callProcedure<ShoppingListRecord>('sp_shopping_list_confirm', [
+    params.shoppingListId,
+    params.householdId,
+    JSON.stringify(params.items),
+    params.displayCurrencyId,
+  ]);
+  return rows[0];
+}
