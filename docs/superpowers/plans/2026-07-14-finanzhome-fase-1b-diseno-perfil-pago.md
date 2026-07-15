@@ -750,7 +750,15 @@ export function PaymentScheduleForm({ profile }: { profile: UserProfileRecord | 
 
 - [ ] **Step 4: Add "Perfil" to the bottom nav with active-state styling**
 
-Modify `src/components/BottomNav.tsx` — read the current file first. Add a 5th entry to `NAV_ITEMS`: `{ href: '/perfil', label: 'Perfil', icon: 'bi-person-circle' }`. Then make the active route visually distinct using the new primary color — convert the component to a client component (`'use client'`) if it isn't already, use `usePathname()` from `next/navigation` to compare against each item's `href`, and apply `text-primary fw-semibold` (vs. the default `text-body`) to the active link's className.
+Modify `src/components/BottomNav.tsx` — read the current file first. Add a 5th entry to `NAV_ITEMS`: `{ href: '/perfil', label: 'Perfil', icon: 'bi-person-circle' }`. Then make the active route carry the design system's signature gradient/glow treatment (this is the SECOND of the two places — alongside `.btn-primary` from Task 1 — where the plan's "spend it in two places" constraint says the gradient/glow is allowed to appear; every other nav item stays flat/quiet): convert the component to a client component (`'use client'`) if it isn't already, use `usePathname()` from `next/navigation` to compare against each item's `href`, and for the active link apply an inline style using the same tokens Task 1 defined:
+```tsx
+style={
+  isActive
+    ? { background: 'var(--gradient-accent)', boxShadow: 'var(--glow-accent)' }
+    : undefined
+}
+```
+applied to a small rounded wrapper around just that item's icon (not the whole nav bar), plus `text-white` on the icon/label when active vs. the default `text-body` when not. Keep the wrapper small (icon + tight padding, not full-width) so it reads as a "pill," matching the reference image's glowing-home-icon treatment.
 
 - [ ] **Step 5: Manual verification**
 
