@@ -2,21 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { auth } from '@/auth';
-import { getHouseholdsForUser, type HouseholdForUserRecord } from '@/lib/db/procedures/household';
+import { requireMembership } from '@/lib/household/require-membership';
 import { createProduct, updateCurrentQuantity, updateProduct } from '@/lib/db/procedures/products';
-
-export async function requireMembership(): Promise<HouseholdForUserRecord> {
-  const session = await auth();
-  if (!session?.user?.id) {
-    throw new Error('No autenticado');
-  }
-  const [membership] = await getHouseholdsForUser(Number(session.user.id));
-  if (!membership) {
-    throw new Error('No pertenecés a ningún hogar todavía');
-  }
-  return membership;
-}
 
 export async function updateCurrentQuantityAction(productId: number, quantity: number): Promise<void> {
   const membership = await requireMembership();
