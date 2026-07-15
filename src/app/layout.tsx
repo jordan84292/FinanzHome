@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
+import { Fraunces } from 'next/font/google';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './globals.css';
 import { Providers } from './providers';
 import { BottomNav } from '@/components/BottomNav';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
+
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  weight: ['600'],
+  variable: '--font-fraunces',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'FinanzHome',
@@ -23,7 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className="pb-5">
+      <body className={`${fraunces.variable} pb-5`}>
         <Providers>
           {children}
           <BottomNav />
