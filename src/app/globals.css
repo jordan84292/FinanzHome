@@ -1,30 +1,33 @@
 :root {
-  --bs-body-bg: #FAF8F5;
-  --bs-body-color: #2B2621;
-  --bs-secondary-color: #7A7268;
-  --bs-border-color: #E8E3DB;
-  --bs-tertiary-bg: #F1ECE3;
+  --bs-body-bg: #1E1B3A;
+  --bs-body-color: #F3F1FA;
+  --bs-secondary-color: #A9A3C9;
+  --bs-border-color: #3D3768;
+  --bs-tertiary-bg: #2A2650;
 
-  --bs-primary: #2F6F5E;
-  --bs-primary-rgb: 47, 111, 94;
-  --bs-primary-text-emphasis: #1F4A3E;
-  --bs-primary-bg-subtle: #E3EEEA;
-  --bs-primary-border-subtle: #BFD8CF;
+  --bs-primary: #A855F7;
+  --bs-primary-rgb: 168, 85, 247;
+  --bs-primary-text-emphasis: #E9D5FF;
+  --bs-primary-bg-subtle: #382B5C;
+  --bs-primary-border-subtle: #5B4A8A;
 
-  --bs-warning: #C1682B;
-  --bs-warning-rgb: 193, 104, 43;
-  --bs-warning-text-emphasis: #7A4118;
-  --bs-warning-bg-subtle: #F5E4D6;
-  --bs-warning-border-subtle: #E8C6A5;
+  --bs-warning: #FB923C;
+  --bs-warning-rgb: 251, 146, 60;
+  --bs-warning-text-emphasis: #FED7AA;
+  --bs-warning-bg-subtle: rgba(251, 146, 60, 0.16);
+  --bs-warning-border-subtle: rgba(251, 146, 60, 0.35);
 
-  --bs-danger: #B3432F;
-  --bs-danger-rgb: 179, 67, 47;
+  --bs-danger: #F87171;
+  --bs-danger-rgb: 248, 113, 113;
 
   --bs-border-radius: 0.75rem;
   --bs-border-radius-sm: 0.5rem;
   --bs-border-radius-lg: 1rem;
 
   --ff-display: var(--font-fraunces), Georgia, serif;
+
+  --gradient-accent: linear-gradient(135deg, #A855F7 0%, #EC4899 100%);
+  --glow-accent: 0 0 20px rgba(168, 85, 247, 0.45);
 }
 
 body {
@@ -38,8 +41,28 @@ body {
   border-radius: var(--bs-border-radius);
 }
 
+.card,
+.list-group-item {
+  background-color: var(--bs-tertiary-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
 .btn {
   border-radius: var(--bs-border-radius-sm);
+}
+
+/* The one signature move: primary buttons carry the gradient + glow.
+   Nothing else on the page does — see Global Constraints on restraint. */
+.btn-primary {
+  background: var(--gradient-accent);
+  border: none;
+  box-shadow: var(--glow-accent);
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background: var(--gradient-accent);
+  filter: brightness(1.08);
+  box-shadow: var(--glow-accent);
 }
 
 h1,

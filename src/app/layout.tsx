@@ -30,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
+    <html lang="es" data-bs-theme="dark">
       <body className={`${fraunces.variable} pb-5`}>
         <Providers>
           {children}

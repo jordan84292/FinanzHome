@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the generic Bootstrap-default look with a deliberate, professional, light visual identity across every existing page, and move payment scheduling out of household creation/joining into a new user profile — replacing a single "día de pago" number with a proper periodicity (semanal/quincenal/mensual) model.
+**Goal:** Replace the generic Bootstrap-default look with a deliberate, dark, glossy fintech visual identity (deep indigo-violet surfaces, a purple→pink gradient accent used as the one signature move) across every existing page, and move payment scheduling out of household creation/joining into a new user profile — replacing a single "día de pago" number with a proper periodicity (semanal/quincenal/mensual) model.
 
-**Architecture:** The visual identity is implemented as Bootstrap 5 CSS-variable overrides (not a rewrite) plus one added display font, so every existing `btn`/`form-control`/`card` class across the app inherits the new look with zero component-level changes. The payment-schedule change follows the exact same DB-first pattern as every prior phase: a stored procedure validates and normalizes the periodicity/day combination, invoked only via `callProcedure`.
+**Architecture:** The visual identity is implemented as Bootstrap 5 CSS-variable overrides on top of Bootstrap's built-in `data-bs-theme="dark"` mode (not a from-scratch dark palette or a rewrite) plus one added display font, so every existing `btn`/`form-control`/`card` class across the app inherits the new look with zero component-level changes. `--bs-primary` stays a solid color (Bootstrap's internals — focus rings, `text-primary`, subtle-bg helpers — expect a solid value); the purple→pink gradient is a separate `--gradient-accent` token applied explicitly to the handful of elements that carry it (primary buttons, the active bottom-nav item). The payment-schedule change follows the exact same DB-first pattern as every prior phase: a stored procedure validates and normalizes the periodicity/day combination, invoked only via `callProcedure`.
+
+**Design direction (revised mid-phase — see note):** The user reviewed an initial light palette (implemented and approved as this plan's original Task 1) and then explicitly asked to pivot to a dark theme with purple/pink gradients, referencing a stock fintech-app mockup. Task 1 below reflects the **final, dark** direction — it supersedes the light tokens from the first Task 1 commit on this branch with a new commit, rather than amending history. If you're executing this plan fresh (not continuing an in-progress branch), you'll simply never see the light version.
 
 **Tech Stack (added this phase):** `next/font/google`'s `Fraunces` (display face for page titles only). No new npm dependency — `next/font` ships with Next.js.
 
@@ -13,7 +15,8 @@
 - **DB-first, no ORM** (carried over): the new profile procedures live in stored procedures; `src/lib/db/procedures/profile.ts` only calls `callProcedure`.
 - **This phase edits already-merged code from Fase 0a and Fase 0b.** Specifically: `sp_household_create`/`sp_household_invitation_accept` (Fase 0a) drop their `payment_day` parameter, and `src/app/onboarding/actions.ts`/`page.tsx`/`src/lib/validation/onboarding.ts` (Fase 0b) drop the "día de pago" field. Treat these as intentional, plan-mandated edits to existing files — read the current file first, don't guess its shape.
 - **Payment periodicity model (confirmed this session):** `weekly` asks for a weekday (1–7). `monthly` asks for a day of month (1–31). `semimonthly` ("quincenal") asks for nothing — it's fixed to the 15th and the last day of the month, which is what "quincenal" means in everyday Costa Rican usage, not a floating 14-day cycle. A user's payment schedule is optional and lives on `users`, settable anytime from `/perfil` — never required at registration or household creation/join time.
-- **Visual system is CSS-variable-driven, not a component rewrite.** Every page keeps its existing Bootstrap classes (`btn btn-primary`, `card`, `form-control`, etc.) — the new palette/radius/font apply automatically once the root variables and font are set up in Task 1. Later tasks only touch markup where the design calls for something a variable override can't reach (e.g., the low-stock indicator's accent border).
+- **Visual system is CSS-variable-driven, not a component rewrite.** Every page keeps its existing Bootstrap classes (`btn btn-primary`, `card`, `form-control`, etc.) — the new palette/radius/font apply automatically once the root variables and font are set up in Task 1. Later tasks only touch markup where the design calls for something a variable override can't reach (e.g., the low-stock indicator's accent border, the bottom-nav active-item glow).
+- **Spend the gradient/glow in exactly two places: primary buttons and the active bottom-nav item.** Everything else (cards, list items, form controls, secondary text) stays a flat, quiet dark surface. This is deliberate restraint, not an oversight — a glow on every element reads as noisy, not premium; a signature move only reads as a signature if most of the screen doesn't have one.
 
 ---
 
@@ -86,37 +89,48 @@ Add `fraunces.variable` to the `<body>` element's `className` (alongside the exi
 <body className={`${fraunces.variable} pb-5`}>
 ```
 
-- [ ] **Step 2: Palette and type tokens**
+- [ ] **Step 1b: Turn on Bootstrap's dark theme**
 
-Modify `src/app/globals.css` — replace its current (near-empty, per Fase 0b Task 7) content with:
+Modify `src/app/layout.tsx` — add `data-bs-theme="dark"` to the `<html>` element:
+```tsx
+<html lang="es" data-bs-theme="dark">
+```
+This flips Bootstrap's own internal light/dark logic (form control backgrounds, default text/border contrast, etc.) before any of our own token overrides apply — doing this first means Task 2 below only has to override the handful of values that need a specific brand color, not fight Bootstrap's light-mode defaults everywhere.
+
+- [ ] **Step 2: Palette, gradient, and type tokens**
+
+Modify `src/app/globals.css` — replace its current content with:
 ```css
 :root {
-  --bs-body-bg: #FAF8F5;
-  --bs-body-color: #2B2621;
-  --bs-secondary-color: #7A7268;
-  --bs-border-color: #E8E3DB;
-  --bs-tertiary-bg: #F1ECE3;
+  --bs-body-bg: #1E1B3A;
+  --bs-body-color: #F3F1FA;
+  --bs-secondary-color: #A9A3C9;
+  --bs-border-color: #3D3768;
+  --bs-tertiary-bg: #2A2650;
 
-  --bs-primary: #2F6F5E;
-  --bs-primary-rgb: 47, 111, 94;
-  --bs-primary-text-emphasis: #1F4A3E;
-  --bs-primary-bg-subtle: #E3EEEA;
-  --bs-primary-border-subtle: #BFD8CF;
+  --bs-primary: #A855F7;
+  --bs-primary-rgb: 168, 85, 247;
+  --bs-primary-text-emphasis: #E9D5FF;
+  --bs-primary-bg-subtle: #382B5C;
+  --bs-primary-border-subtle: #5B4A8A;
 
-  --bs-warning: #C1682B;
-  --bs-warning-rgb: 193, 104, 43;
-  --bs-warning-text-emphasis: #7A4118;
-  --bs-warning-bg-subtle: #F5E4D6;
-  --bs-warning-border-subtle: #E8C6A5;
+  --bs-warning: #FB923C;
+  --bs-warning-rgb: 251, 146, 60;
+  --bs-warning-text-emphasis: #FED7AA;
+  --bs-warning-bg-subtle: rgba(251, 146, 60, 0.16);
+  --bs-warning-border-subtle: rgba(251, 146, 60, 0.35);
 
-  --bs-danger: #B3432F;
-  --bs-danger-rgb: 179, 67, 47;
+  --bs-danger: #F87171;
+  --bs-danger-rgb: 248, 113, 113;
 
   --bs-border-radius: 0.75rem;
   --bs-border-radius-sm: 0.5rem;
   --bs-border-radius-lg: 1rem;
 
   --ff-display: var(--font-fraunces), Georgia, serif;
+
+  --gradient-accent: linear-gradient(135deg, #A855F7 0%, #EC4899 100%);
+  --glow-accent: 0 0 20px rgba(168, 85, 247, 0.45);
 }
 
 body {
@@ -130,8 +144,28 @@ body {
   border-radius: var(--bs-border-radius);
 }
 
+.card,
+.list-group-item {
+  background-color: var(--bs-tertiary-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
 .btn {
   border-radius: var(--bs-border-radius-sm);
+}
+
+/* The one signature move: primary buttons carry the gradient + glow.
+   Nothing else on the page does — see Global Constraints on restraint. */
+.btn-primary {
+  background: var(--gradient-accent);
+  border: none;
+  box-shadow: var(--glow-accent);
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background: var(--gradient-accent);
+  filter: brightness(1.08);
+  box-shadow: var(--glow-accent);
 }
 
 h1,
@@ -142,20 +176,21 @@ h1,
   color: var(--bs-primary-text-emphasis);
 }
 ```
+Note `.btn-primary` overriding `background`/`box-shadow` directly (rather than relying only on `--bs-primary`) is intentional — Bootstrap derives several other things (`text-primary`, `border-primary`, focus-ring color) from the solid `--bs-primary` value, and those must stay a real solid color for Bootstrap's own contrast math to keep working. The gradient is layered on top for this one component, not baked into the primary token itself.
 
 - [ ] **Step 3: Manual verification**
 
-Run: `npm run dev`. Open `http://localhost:3000/login`. Confirm: the page background is warm off-white (not pure white), the primary button is deep teal-green (not Bootstrap's default blue), and any `<h1>` on the page renders in the serif display font at a visibly different weight/character than the body text. Use browser dev tools at ~390px width to confirm nothing looks broken at mobile size. Stop the dev server when done.
+Run: `npm run dev`. Open `http://localhost:3000/login`. Confirm: the page background is deep indigo-violet (not white, not pure black), any primary button renders the purple→pink gradient with a soft glow (not a flat color), form inputs/cards read correctly against the dark background (light text, visible borders — this is Bootstrap's `data-bs-theme="dark"` doing its job, not something we hand-coded), and any `<h1>` renders in the serif display font in a light lavender tone distinct from body text. Use browser dev tools at ~390px width to confirm nothing looks broken at mobile size and that form text remains legible (sufficient contrast against the dark background — this matters more in dark mode than light, check it for real). Stop the dev server when done.
 
 - [ ] **Step 4: Run full suite and build, then commit**
 
-Run: `npm test` — expected: 38/38 still passing (pure CSS/font change, no logic touched).
+Run: `npm test` — expected: passing at whatever count this branch is currently at (pure CSS/font change, no logic touched — if a Task 1 commit already exists on this branch from before the dark-theme pivot, this step replaces its diff, not adds to it).
 
 Run: `npm run build` — expected: succeeds.
 
 ```bash
 git add -A
-git commit -m "feat(ui): establish visual design system (warm palette, display font, radius tokens)"
+git commit -m "feat(ui): rework design system as dark theme with gradient accent (per updated direction)"
 ```
 
 ---
@@ -165,7 +200,8 @@ git commit -m "feat(ui): establish visual design system (warm palette, display f
 **Files:**
 - Create: `db/migrations/004_payment_schedule.sql`
 - Modify: `db/procedures/sp_household_create.sql`
-- Modify: `db/procedures/sp_household_invitation_accept.sql`
+- Modify: `db/procedures/sp_household_invitation_accept.sql` (INSERT and trailing SELECT)
+- Modify: `db/procedures/sp_household_get_for_user.sql` (SELECT column list only — this file wasn't part of the original plan and was found to break at runtime otherwise)
 - Modify: `src/lib/db/procedures/household.ts`
 - Modify: `tests/db/procedures/household.test.ts`
 
@@ -192,7 +228,7 @@ ALTER TABLE users
     OR (payment_frequency IS NULL AND payment_weekday IS NULL AND payment_day IS NULL)
   );
 ```
-If `npm run db:migrate` reports the `DROP CHECK` constraint name doesn't match what's actually in the DB, run `SHOW CREATE TABLE household_members;` against `finanzhome` to find the real constraint name (Fase 0a's migration named it `chk_household_members_payment_day`, but confirm rather than assume) and use that exact name.
+**Known MariaDB 10.4 syntax note (confirmed during execution):** `DROP CHECK <name>` combined with another clause (`DROP COLUMN ...`) in the same `ALTER TABLE` statement is not valid MariaDB 10.4 syntax — use `DROP CONSTRAINT <name>` instead (same constraint name, `chk_household_members_payment_day`), which works when combined with other clauses. If `npm run db:migrate` still reports the constraint name doesn't match what's actually in the DB, run `SHOW CREATE TABLE household_members;` against `finanzhome` to find the real name and use that.
 
 Run: `npm run db:migrate` — expected: `applied migration: 004_payment_schedule.sql`.
 
@@ -202,9 +238,11 @@ Verify: `"/c/xampp/mysql/bin/mysql.exe" -h 127.0.0.1 -P 3307 -u root finanzhome 
 
 Modify `db/procedures/sp_household_create.sql` — read the current file first. Remove the `IN p_creator_payment_day TINYINT UNSIGNED` parameter, and remove `payment_day`/its value from the `INSERT INTO household_members (...)` column list and `VALUES (...)` list. Leave everything else (the household INSERT, the final SELECT) unchanged.
 
-Modify `db/procedures/sp_household_invitation_accept.sql` — same treatment: remove `IN p_payment_day TINYINT UNSIGNED`, remove `payment_day` from the `INSERT INTO household_members` column/values lists. Leave the SIGNAL-based invitation-status checks and everything else unchanged.
+Modify `db/procedures/sp_household_invitation_accept.sql` — same treatment: remove `IN p_payment_day TINYINT UNSIGNED`, remove `payment_day` from the `INSERT INTO household_members` column/values lists **and from its trailing `SELECT`'s column list** (it returns the newly-created membership row — that SELECT still names `payment_day` and must drop it too, or the query will fail once the column doesn't exist). Leave the SIGNAL-based invitation-status checks and everything else unchanged.
 
-Run: `npm run db:migrate` — expected: both procedures reload cleanly (`loaded procedure: sp_household_create.sql`, `sp_household_invitation_accept.sql`).
+**Also modify `db/procedures/sp_household_get_for_user.sql`** (not touched in Fase 0a/0b since it was written, but it `SELECT`s `payment_day` from `household_members` — confirmed during execution to break at runtime otherwise, since it's called by `getHouseholdsForUser`, itself called from nearly every Server Action in the app to derive the caller's household). Read it first, then remove `payment_day` from its `SELECT` column list only — nothing else in that procedure changes.
+
+Run: `npm run db:migrate` — expected: all three procedures reload cleanly (`loaded procedure: sp_household_create.sql`, `sp_household_invitation_accept.sql`, `sp_household_get_for_user.sql`).
 
 - [ ] **Step 3: Update the wrapper**
 
