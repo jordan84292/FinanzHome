@@ -267,26 +267,32 @@ Para los demás casos "N filas variables" (splits de compra, % de gasto comparti
 
 ---
 
-## Fase 7 — Recordatorios por correo (Resend)
+## Fase 7 — Recordatorios por WhatsApp (decidido — reemplaza el email para este módulo específicamente)
+
+**Cambio de dirección (registrado en Fase 1b):** los recordatorios recurrentes de esta fase salen por **WhatsApp Business API**, no por email. Esto NO afecta el email de invitación a miembros del hogar (Fase 0, ya construido con Resend) — ese se queda como está; Resend sigue siendo parte del stack para eso. Solo el canal de *recordatorios* cambia.
+
+**Prerrequisito externo, no automatizable:** antes de implementar esta fase hace falta una cuenta de WhatsApp Business API real (Meta Cloud API directo, o un BSP como Twilio/360dialog), con número de negocio verificado y plantillas de mensaje pre-aprobadas por Meta para conversaciones iniciadas por la empresa (un recordatorio es justamente ese caso — no es una respuesta dentro de una ventana de 24h iniciada por el usuario). Este setup se hace en el panel del proveedor elegido, fuera del control del asistente. **No arrancar la implementación de esta fase hasta tener la cuenta y al menos una plantilla aprobada.**
+
+**Nuevo requisito de datos (a diseñar en detalle cuando se planifique esta fase):** para enviar por WhatsApp hace falta un número de teléfono por usuario — probablemente una columna `phone_number` en `users` (o su propia tabla si se necesita verificación), poblable desde `/perfil` (la misma pantalla que ya tiene el horario de pago, Fase 1b).
 
 **Objetivo:** avisar 1 día antes del vencimiento, insistir a diario desde el día de pago del responsable hasta que se marque pagado, y avisar el día de retiro de fondos.
 
 **Tablas:** `reminder_log`
 
-**Stored procedures (solo lectura + logging, el envío real de email pasa por TS/Resend porque un SP no puede hacer HTTP):**
+**Stored procedures (solo lectura + logging, el envío real pasa por TS porque un SP no puede hacer HTTP — este diseño no cambia por el cambio de canal):**
 - `sp_reminder_get_pending(today_date)` — calcula, en una sola pasada, las tres categorías:
   1. **due_soon**: `occurrence.due_date = today + 1` y `is_paid = 0` y no hay `reminder_log` de tipo `due_soon` para hoy
   2. **overdue_daily**: `occurrence.due_date < today`, `is_paid = 0`, y `today >= próximo payment_day del responsable en o después de due_date` (aritmética con `DAY()`/`DATE_ADD`, sin JSON), y no hay `reminder_log` de tipo `overdue_daily` para hoy
   3. **withdrawal**: `recurring_expenses.withdrawal_day = DAY(today)` para gastos weekly/biweekly activos, sin `reminder_log` de tipo `withdrawal` para hoy
 - `sp_reminder_log_sent(occurrence_id, member_id, reminder_type, sent_date)` — idempotencia (un envío por tipo/ocurrencia/día)
 
-**Wrappers TS:** `reminders.ts` → `getPendingReminders`, `logReminderSent`; `lib/email/resend.ts` → `sendReminderEmail(type, occurrence, member)`
+**Wrappers TS:** `reminders.ts` → `getPendingReminders`, `logReminderSent`; `lib/whatsapp/client.ts` → `sendReminderWhatsAppMessage(type, occurrence, member)` (usa una plantilla aprobada por tipo de recordatorio — el proveedor elegido define la forma exacta del payload)
 
 **Infraestructura (fuera del alcance de "solo SPs", es orquestación):**
-- Route Handler `POST /api/cron/reminders`, protegido con un secret en header, que: llama `getPendingReminders` → envía por Resend → llama `logReminderSent` por cada envío exitoso
+- Route Handler `POST /api/cron/reminders`, protegido con un secret en header, que: llama `getPendingReminders` → envía por WhatsApp Business API → llama `logReminderSent` por cada envío exitoso
 - **Disparador diario: Vercel Cron Jobs** (decidido — el hosting es Vercel), configurado en `vercel.json` para pegarle una vez al día a `/api/cron/reminders`.
 
-**UI:** no hay pantalla nueva obligatoria para el MVP — "Marcar como pagado" (ya construido en Fase 5) es lo que corta el loop diario.
+**UI:** no hay pantalla nueva obligatoria para el MVP más allá del campo de teléfono en `/perfil` — "Marcar como pagado" (ya construido en Fase 5) es lo que corta el loop diario.
 
 **Notas MariaDB:** sin restricciones; toda la lógica de fechas es DATE/INT estándar.
 
@@ -353,8 +359,10 @@ No se construye código en esta fase; se deja documentado por qué el modelo de 
 ## Decisiones abiertas (para resolver antes de implementar, no antes de aprobar el plan)
 
 1. ~~Hosting de despliegue~~ — **Resuelto: Vercel.** Fase 7 usa Vercel Cron Jobs (`vercel.json`) contra `/api/cron/reminders`.
-2. **Estrategia next-auth v5**: recomendada Credentials + JWT sin adapter de DB (evita que next-auth escriba SQL fuera de los SPs). A confirmar.
+2. ~~Estrategia next-auth v5~~ — **Resuelto: Credentials + JWT sin adapter de DB** (confirmado e implementado en Fase 0b).
 3. ~~Moneda única~~ — **Resuelto: multi-moneda CRC/USD** con tipo de cambio manual (módulo en Fase 0), conversión en Fases 2/8/9 vía subconsulta correlacionada (no `FUNCTION` almacenada, para evitar el gotcha de `log_bin_trust_function_creators`).
+4. ~~Canal de recordatorios~~ — **Resuelto: WhatsApp Business API** (decidido en Fase 1b, reemplaza el email solo para el módulo de recordatorios de Fase 7 — la invitación por email de Fase 0 no cambia). **Sigue pendiente**: qué proveedor exacto (Meta Cloud API directo vs. un BSP como Twilio/360dialog) — a decidir cuando arranque la implementación de Fase 7, junto con la cuenta de negocio verificada y las plantillas aprobadas (prerrequisito externo, ver nota en la sección de Fase 7).
+5. ~~Día de pago del hogar~~ — **Resuelto: vive en el perfil del usuario** (`/perfil`, Fase 1b), no en la creación/unión al hogar, y es una periodicidad (semanal/quincenal/mensual) en vez de un día 1-31 suelto. Reemplaza el diseño original descrito en la sección "Hogar y miembros" más abajo.
 
 ## Cobertura del spec (auto-chequeo)
 
@@ -370,7 +378,7 @@ No se construye código en esta fase; se deja documentado por qué el modelo de 
 | Gastos compartidos con % default editable | Fase 6 |
 | Metas de ahorro | Fase 9 |
 | Dashboard (categoría, evolución, saldo entre miembros, metas) | Fase 8 |
-| Notificaciones push/WhatsApp | Explícitamente fuera de alcance (post-Resend, no bloqueante) |
+| Notificaciones por WhatsApp | Fase 7 (reemplaza email para recordatorios — ver Decisión Abierta #4) |
 | PWA instalable + offline lista de compras | Fase 0 (shell) + Fase 4 (offline real) |
 | Presupuesto por categoría / reportes / auditoría | Fase 10 (solo diseño) |
 
