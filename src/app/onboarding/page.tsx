@@ -25,18 +25,6 @@ export default async function OnboardingPage({
             <label htmlFor="displayName" className="form-label">Tu nombre</label>
             <input id="displayName" name="displayName" type="text" className="form-control" required />
           </div>
-          <div>
-            <label htmlFor="paymentDay" className="form-label">Día de pago (1-31)</label>
-            <input
-              id="paymentDay"
-              name="paymentDay"
-              type="number"
-              min={1}
-              max={31}
-              className="form-control"
-              required
-            />
-          </div>
           <button type="submit" className="btn btn-primary">Unirme</button>
         </form>
       </main>
@@ -56,18 +44,6 @@ export default async function OnboardingPage({
         <div>
           <label htmlFor="name" className="form-label">Nombre del hogar</label>
           <input id="name" name="name" type="text" className="form-control" required />
-        </div>
-        <div>
-          <label htmlFor="paymentDay" className="form-label">Tu día de pago (1-31)</label>
-          <input
-            id="paymentDay"
-            name="paymentDay"
-            type="number"
-            min={1}
-            max={31}
-            className="form-control"
-            required
-          />
         </div>
         <button type="submit" className="btn btn-primary">Crear hogar</button>
       </form>

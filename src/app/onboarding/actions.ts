@@ -20,7 +20,6 @@ export async function createHouseholdAction(
 
   const parsed = createHouseholdSchema.safeParse({
     name: formData.get('name'),
-    paymentDay: formData.get('paymentDay'),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos' };
@@ -30,7 +29,6 @@ export async function createHouseholdAction(
     name: parsed.data.name,
     creatorUserId: Number(session.user.id),
     creatorDisplayName: session.user.name ?? 'Miembro',
-    creatorPaymentDay: parsed.data.paymentDay,
   });
 
   redirect('/');
@@ -48,7 +46,6 @@ export async function acceptInvitationAction(
   const parsed = acceptInvitationSchema.safeParse({
     token: formData.get('token'),
     displayName: formData.get('displayName'),
-    paymentDay: formData.get('paymentDay'),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Datos inválidos' };
@@ -59,7 +56,6 @@ export async function acceptInvitationAction(
       token: parsed.data.token,
       userId: Number(session.user.id),
       displayName: parsed.data.displayName,
-      paymentDay: parsed.data.paymentDay,
     });
   } catch {
     return { error: 'La invitación no es válida o ya expiró' };
