@@ -19,3 +19,13 @@ export async function initSplit(
     householdId,
   ]);
 }
+
+export async function getSplit(
+  shoppingListId: number,
+  householdId: number,
+): Promise<ShoppingListSplitRecord[]> {
+  return callProcedure<ShoppingListSplitRecord>('sp_shopping_list_split_get', [
+    shoppingListId,
+    householdId,
+  ]);
+}

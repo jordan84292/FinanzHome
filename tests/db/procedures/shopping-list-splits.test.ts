@@ -12,7 +12,7 @@ import {
   generateOrGetShoppingList,
   getShoppingListItems,
 } from '@/lib/db/procedures/shopping-list';
-import { initSplit } from '@/lib/db/procedures/shopping-list-splits';
+import { getSplit, initSplit } from '@/lib/db/procedures/shopping-list-splits';
 import { uniqueSuffix } from '../../helpers/db';
 
 const CRC_ID = 1;
@@ -200,5 +200,61 @@ describe('sp_shopping_list_split_init', () => {
     const list = await generateOrGetShoppingList(householdId, memberId);
 
     await expect(initSplit(list.id, householdId)).rejects.toThrow(/not found or not confirmed/i);
+  });
+});
+
+describe('sp_shopping_list_split_get', () => {
+  it('returns the split rows with member display names', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId,
+      memberId,
+      suffix,
+      optimalQuantity: 4,
+      currentQuantity: 0,
+      defaultPrice: 800,
+    });
+    await initSplit(shoppingListId, householdId);
+
+    const splits = await getSplit(shoppingListId, householdId);
+
+    expect(splits).toHaveLength(1);
+    expect(splits[0].display_name).toBe('Owner');
+    expect(splits[0].percentage).toBe(100);
+  });
+
+  it('returns an empty array for a confirmed list with no split yet', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId,
+      memberId,
+      suffix,
+      optimalQuantity: 2,
+      currentQuantity: 0,
+      defaultPrice: 300,
+    });
+
+    const splits = await getSplit(shoppingListId, householdId);
+
+    expect(splits).toHaveLength(0);
+  });
+
+  it('rejects a shopping list belonging to a different household', async () => {
+    const suffixA = uniqueSuffix();
+    const suffixB = uniqueSuffix();
+    const { householdId: householdIdA, memberId: memberIdA } = await createMember(suffixA);
+    const { householdId: householdIdB } = await createMember(suffixB);
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId: householdIdA,
+      memberId: memberIdA,
+      suffix: suffixA,
+      optimalQuantity: 2,
+      currentQuantity: 0,
+      defaultPrice: 400,
+    });
+
+    await expect(getSplit(shoppingListId, householdIdB)).rejects.toThrow(/not found in this household/i);
   });
 });
