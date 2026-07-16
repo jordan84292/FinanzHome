@@ -10,6 +10,12 @@ import {
   getShoppingListItems,
   updateShoppingListItem,
 } from '@/lib/db/procedures/shopping-list';
+import {
+  getSplit,
+  initSplit,
+  updateSplit,
+  type ShoppingListSplitRecord,
+} from '@/lib/db/procedures/shopping-list-splits';
 
 const addItemSchema = z.object({
   shoppingListId: z.coerce.number().int().positive(),
@@ -133,10 +139,54 @@ export async function confirmPurchaseAction(shoppingListId: number): Promise<Con
       })),
       displayCurrencyId: DISPLAY_CURRENCY_ID,
     });
+    await initSplit(shoppingListId, membership.id);
   } catch {
     return { error: 'No se pudo confirmar la compra. Intentá de nuevo.' };
   }
 
   revalidatePath('/compras');
   return { error: null };
+}
+
+export interface GetSplitState {
+  splits: ShoppingListSplitRecord[];
+  error: string | null;
+}
+
+export async function getSplitAction(shoppingListId: number): Promise<GetSplitState> {
+  const membership = await requireMembership();
+  try {
+    const splits = await getSplit(shoppingListId, membership.id);
+    return { splits, error: null };
+  } catch {
+    return { splits: [], error: 'No se pudo cargar la división del gasto.' };
+  }
+}
+
+export interface UpdateSplitState {
+  splits: ShoppingListSplitRecord[];
+  error: string | null;
+}
+
+export async function updateSplitAction(
+  shoppingListId: number,
+  updates: Array<{ memberId: number; percentage: number }>,
+): Promise<UpdateSplitState> {
+  const membership = await requireMembership();
+
+  if (updates.length === 0) {
+    return { splits: [], error: 'Datos inválidos' };
+  }
+
+  try {
+    const splits = await updateSplit({
+      shoppingListId,
+      householdId: membership.id,
+      updates,
+    });
+    revalidatePath('/compras');
+    return { splits, error: null };
+  } catch {
+    return { splits: [], error: 'Los porcentajes deben sumar 100%.' };
+  }
 }

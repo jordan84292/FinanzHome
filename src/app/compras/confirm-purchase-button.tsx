@@ -1,12 +1,14 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { confirmPurchaseAction } from './actions';
+import { SplitPanel } from '@/components/shopping-list/SplitPanel';
 import { showError, showSuccess } from '@/lib/ui/alerts';
 
 export function ConfirmPurchaseButton({ shoppingListId }: { shoppingListId: number }) {
   const [isPending, startTransition] = useTransition();
+  const [confirmedListId, setConfirmedListId] = useState<number | null>(null);
   const router = useRouter();
 
   function handleConfirm(): void {
@@ -18,6 +20,7 @@ export function ConfirmPurchaseButton({ shoppingListId }: { shoppingListId: numb
             return;
           }
           showSuccess('Compra confirmada. Tu inventario se actualizó.');
+          setConfirmedListId(shoppingListId);
           router.refresh();
         })
         .catch(() => {
@@ -27,8 +30,13 @@ export function ConfirmPurchaseButton({ shoppingListId }: { shoppingListId: numb
   }
 
   return (
-    <button type="button" className="btn btn-primary" disabled={isPending} onClick={handleConfirm}>
-      {isPending ? 'Confirmando…' : 'Confirmar compra'}
-    </button>
+    <>
+      <button type="button" className="btn btn-primary" disabled={isPending} onClick={handleConfirm}>
+        {isPending ? 'Confirmando…' : 'Confirmar compra'}
+      </button>
+      {confirmedListId ? (
+        <SplitPanel shoppingListId={confirmedListId} onClose={() => setConfirmedListId(null)} />
+      ) : null}
+    </>
   );
 }
