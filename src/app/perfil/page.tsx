@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { getUserProfile } from '@/lib/db/procedures/profile';
@@ -19,6 +20,11 @@ export default async function ProfilePage() {
 
       <h2 className="h6 text-body-secondary text-uppercase mb-3">Periodicidad de pago</h2>
       <PaymentScheduleForm profile={profile} />
+
+      <h2 className="h6 text-body-secondary text-uppercase mt-4 mb-3">Tu hogar</h2>
+      <Link href="/hogar/miembros" className="btn btn-outline-primary w-100">
+        Gestionar miembros del hogar
+      </Link>
 
       <form action={logoutAction} className="mt-5">
         <button type="submit" className="btn btn-outline-danger w-100">

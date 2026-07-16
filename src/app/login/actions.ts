@@ -3,6 +3,8 @@
 import { redirect } from 'next/navigation';
 import { AuthError } from 'next-auth';
 import { signIn } from '@/auth';
+import { getUserByEmail } from '@/lib/db/procedures/auth';
+import { getHouseholdsForUser } from '@/lib/db/procedures/household';
 
 export interface LoginActionState {
   error: string | null;
@@ -28,5 +30,7 @@ export async function loginAction(
     throw error;
   }
 
-  redirect('/onboarding');
+  const user = await getUserByEmail(email);
+  const households = user ? await getHouseholdsForUser(user.id) : [];
+  redirect(households.length > 0 ? '/inventario' : '/onboarding');
 }
