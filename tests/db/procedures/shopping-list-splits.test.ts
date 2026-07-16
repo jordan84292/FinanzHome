@@ -12,7 +12,7 @@ import {
   generateOrGetShoppingList,
   getShoppingListItems,
 } from '@/lib/db/procedures/shopping-list';
-import { getSplit, initSplit } from '@/lib/db/procedures/shopping-list-splits';
+import { getSplit, initSplit, updateSplit } from '@/lib/db/procedures/shopping-list-splits';
 import { uniqueSuffix } from '../../helpers/db';
 
 const CRC_ID = 1;
@@ -256,5 +256,98 @@ describe('sp_shopping_list_split_get', () => {
     });
 
     await expect(getSplit(shoppingListId, householdIdB)).rejects.toThrow(/not found in this household/i);
+  });
+});
+
+describe('updateSplit (transactional)', () => {
+  it('updates all members and validates the sum in one transaction', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({
+      householdId,
+      invitedByMemberId: memberId,
+      suffix,
+    });
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId,
+      memberId,
+      suffix,
+      optimalQuantity: 10,
+      currentQuantity: 0,
+      defaultPrice: 1000,
+    });
+    await initSplit(shoppingListId, householdId);
+
+    const result = await updateSplit({
+      shoppingListId,
+      householdId,
+      updates: [
+        { memberId, percentage: 70 },
+        { memberId: secondMemberId, percentage: 30 },
+      ],
+    });
+
+    expect(result.find((r) => r.member_id === memberId)?.percentage).toBe(70);
+    expect(result.find((r) => r.member_id === secondMemberId)?.percentage).toBe(30);
+    expect(result.find((r) => r.member_id === memberId)?.amount_owed).toBe(7000);
+    expect(result.find((r) => r.member_id === secondMemberId)?.amount_owed).toBe(3000);
+  });
+
+  it('rolls back all updates when the percentages do not sum to 100', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({
+      householdId,
+      invitedByMemberId: memberId,
+      suffix,
+    });
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId,
+      memberId,
+      suffix,
+      optimalQuantity: 10,
+      currentQuantity: 0,
+      defaultPrice: 1000,
+    });
+    await initSplit(shoppingListId, householdId);
+
+    await expect(
+      updateSplit({
+        shoppingListId,
+        householdId,
+        updates: [
+          { memberId, percentage: 60 },
+          { memberId: secondMemberId, percentage: 30 },
+        ],
+      }),
+    ).rejects.toThrow(/must sum to 100/i);
+
+    const unchanged = await getSplit(shoppingListId, householdId);
+    expect(unchanged.find((r) => r.member_id === memberId)?.percentage).toBe(50);
+    expect(unchanged.find((r) => r.member_id === secondMemberId)?.percentage).toBe(50);
+  });
+
+  it('rejects updating a member that does not belong to the household', async () => {
+    const suffixA = uniqueSuffix();
+    const suffixB = uniqueSuffix();
+    const { householdId: householdIdA, memberId: memberIdA } = await createMember(suffixA);
+    const { householdId: householdIdB, memberId: memberIdB } = await createMember(suffixB);
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId: householdIdA,
+      memberId: memberIdA,
+      suffix: suffixA,
+      optimalQuantity: 5,
+      currentQuantity: 0,
+      defaultPrice: 500,
+    });
+    await initSplit(shoppingListId, householdIdA);
+
+    await expect(
+      updateSplit({
+        shoppingListId,
+        householdId: householdIdA,
+        updates: [{ memberId: memberIdB, percentage: 100 }],
+      }),
+    ).rejects.toThrow(/not found in this household/i);
   });
 });
