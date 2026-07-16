@@ -33,6 +33,9 @@ export default function LoginPage() {
       <p className="mt-3 small">
         ¿No tenés cuenta? <Link href="/register">Creá una</Link>
       </p>
+      <p className="mt-2 small">
+        <Link href="/olvide-password">¿Olvidaste tu contraseña?</Link>
+      </p>
     </main>
   );
 }
