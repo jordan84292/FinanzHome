@@ -15,6 +15,8 @@ BEGIN
   DECLARE v_member_id INT UNSIGNED;
   DECLARE v_is_first TINYINT DEFAULT 1;
   DECLARE v_done INT DEFAULT 0;
+  DECLARE v_amount_sum DECIMAL(12,2);
+  DECLARE v_amount_diff DECIMAL(12,2);
   DECLARE v_member_cursor CURSOR FOR
     SELECT id FROM household_members WHERE household_id = p_household_id ORDER BY id ASC;
   DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
@@ -58,10 +60,30 @@ BEGIN
         SET v_percentage = v_base_percentage;
       END IF;
 
+      -- IGNORE only exists to absorb a racing duplicate-key insert on
+      -- (shopping_list_id, member_id); currently safe because member_id comes
+      -- from the household cursor, the list was already validated above, and
+      -- v_percentage/v_total are both non-NULL and bounded here — but it will
+      -- also silently suppress any future FK/CHECK/NOT NULL violation on this
+      -- INSERT, so revisit if this procedure's inputs ever become less constrained.
       INSERT IGNORE INTO shopping_list_splits (shopping_list_id, member_id, percentage, amount_owed)
       VALUES (p_shopping_list_id, v_member_id, v_percentage, ROUND(v_total * v_percentage / 100, 2));
     END LOOP;
     CLOSE v_member_cursor;
+
+    SELECT SUM(amount_owed) INTO v_amount_sum
+    FROM shopping_list_splits
+    WHERE shopping_list_id = p_shopping_list_id;
+
+    SET v_amount_diff = v_total - v_amount_sum;
+
+    IF v_amount_diff <> 0 THEN
+      UPDATE shopping_list_splits
+      SET amount_owed = amount_owed + v_amount_diff
+      WHERE shopping_list_id = p_shopping_list_id
+      ORDER BY member_id ASC
+      LIMIT 1;
+    END IF;
   END IF;
 
   SELECT sls.id, sls.shopping_list_id, sls.member_id, hm.display_name, sls.percentage, sls.amount_owed

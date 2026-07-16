@@ -7,6 +7,7 @@ import {
   addShoppingListItem,
   confirmShoppingList,
   deleteShoppingListItem,
+  getShoppingList,
   getShoppingListItems,
   updateShoppingListItem,
 } from '@/lib/db/procedures/shopping-list';
@@ -163,7 +164,13 @@ export interface GetSplitState {
 export async function getSplitAction(shoppingListId: number): Promise<GetSplitState> {
   const membership = await requireMembership();
   try {
-    const splits = await getSplit(shoppingListId, membership.id);
+    let splits = await getSplit(shoppingListId, membership.id);
+    if (splits.length === 0) {
+      const list = await getShoppingList(shoppingListId, membership.id, DISPLAY_CURRENCY_ID);
+      if (list.status === 'confirmed') {
+        splits = await initSplit(shoppingListId, membership.id);
+      }
+    }
     return { splits, error: null };
   } catch {
     return { splits: [], error: 'No se pudo cargar la división del gasto.' };

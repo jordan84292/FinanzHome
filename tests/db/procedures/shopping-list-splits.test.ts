@@ -36,6 +36,26 @@ async function createMember(suffix: string): Promise<{
   return { householdId: household.id, memberId: membership.member_id, ownerUserId: user.id };
 }
 
+async function createThreeMemberHousehold(suffix: string): Promise<{
+  householdId: number;
+  memberId: number;
+  secondMemberId: number;
+  thirdMemberId: number;
+}> {
+  const { householdId, memberId } = await createMember(suffix);
+  const { memberId: secondMemberId } = await addSecondMember({
+    householdId,
+    invitedByMemberId: memberId,
+    suffix: `${suffix}_b`,
+  });
+  const { memberId: thirdMemberId } = await addSecondMember({
+    householdId,
+    invitedByMemberId: memberId,
+    suffix: `${suffix}_c`,
+  });
+  return { householdId, memberId, secondMemberId, thirdMemberId };
+}
+
 async function addSecondMember(params: {
   householdId: number;
   invitedByMemberId: number;
@@ -143,6 +163,27 @@ describe('sp_shopping_list_split_init', () => {
     expect(splits[0].percentage).toBe(33.34);
     expect(splits[1].percentage).toBe(33.33);
     expect(splits[2].percentage).toBe(33.33);
+  });
+
+  it('reconciles amount_owed to sum exactly to total_estimated when the equal split leaves a residual cent', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createThreeMemberHousehold(suffix);
+    // 10 units at 1.00 CRC each => total_estimated = 10.00, split 33.34/33.33/33.33
+    // independently rounds to 3.33/3.33/3.33 = 9.99, a cent short of 10.00.
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId,
+      memberId,
+      suffix,
+      optimalQuantity: 10,
+      currentQuantity: 0,
+      defaultPrice: 1,
+    });
+
+    const splits = await initSplit(shoppingListId, householdId);
+
+    expect(splits).toHaveLength(3);
+    const totalOwedCents = Math.round(splits.reduce((sum, s) => sum + s.amount_owed, 0) * 100);
+    expect(totalOwedCents).toBe(1000);
   });
 
   it('is idempotent: calling it twice does not duplicate rows', async () => {
@@ -325,6 +366,37 @@ describe('updateSplit (transactional)', () => {
     const unchanged = await getSplit(shoppingListId, householdId);
     expect(unchanged.find((r) => r.member_id === memberId)?.percentage).toBe(50);
     expect(unchanged.find((r) => r.member_id === secondMemberId)?.percentage).toBe(50);
+  });
+
+  it('reconciles amount_owed to sum exactly to total_estimated for arbitrary percentages that leave a residual cent', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId, secondMemberId, thirdMemberId } =
+      await createThreeMemberHousehold(suffix);
+    // 10 units at 1.00 CRC each => total_estimated = 10.00; 33.34/33.33/33.33
+    // independently rounds to 3.33/3.33/3.33 = 9.99, a cent short of 10.00.
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId,
+      memberId,
+      suffix,
+      optimalQuantity: 10,
+      currentQuantity: 0,
+      defaultPrice: 1,
+    });
+    await initSplit(shoppingListId, householdId);
+
+    const result = await updateSplit({
+      shoppingListId,
+      householdId,
+      updates: [
+        { memberId, percentage: 33.34 },
+        { memberId: secondMemberId, percentage: 33.33 },
+        { memberId: thirdMemberId, percentage: 33.33 },
+      ],
+    });
+
+    expect(result).toHaveLength(3);
+    const totalOwedCents = Math.round(result.reduce((sum, s) => sum + s.amount_owed, 0) * 100);
+    expect(totalOwedCents).toBe(1000);
   });
 
   it('rejects updating a member that does not belong to the household', async () => {
