@@ -139,9 +139,16 @@ export async function confirmPurchaseAction(shoppingListId: number): Promise<Con
       })),
       displayCurrencyId: DISPLAY_CURRENCY_ID,
     });
-    await initSplit(shoppingListId, membership.id);
   } catch {
     return { error: 'No se pudo confirmar la compra. Intentá de nuevo.' };
+  }
+
+  try {
+    await initSplit(shoppingListId, membership.id);
+  } catch {
+    // La compra ya se confirmó (inventario actualizado); solo falló la
+    // inicialización de la división del gasto. No hay que decirle al usuario
+    // que la compra falló ni pedirle que reintente confirmar.
   }
 
   revalidatePath('/compras');
