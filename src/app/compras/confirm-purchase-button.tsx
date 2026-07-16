@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation';
 import { confirmPurchaseAction } from './actions';
 import { showError, showSuccess } from '@/lib/ui/alerts';
 
-export function ConfirmPurchaseButton({ shoppingListId }: { shoppingListId: number }) {
+export function ConfirmPurchaseButton({
+  shoppingListId,
+  onConfirmed,
+}: {
+  shoppingListId: number;
+  onConfirmed: (shoppingListId: number) => void;
+}) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -18,6 +24,7 @@ export function ConfirmPurchaseButton({ shoppingListId }: { shoppingListId: numb
             return;
           }
           showSuccess('Compra confirmada. Tu inventario se actualizó.');
+          onConfirmed(shoppingListId);
           router.refresh();
         })
         .catch(() => {

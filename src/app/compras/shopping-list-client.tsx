@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ShoppingListItemRow } from '@/components/shopping-list/ShoppingListItemRow';
 import { ShoppingListItemForm } from '@/components/shopping-list/ShoppingListItemForm';
 import { ConfirmPurchaseButton } from './confirm-purchase-button';
+import { SplitPanel } from '@/components/shopping-list/SplitPanel';
 import type { ProductRecord } from '@/lib/db/procedures/products';
 import type { ShoppingListItemRecord, ShoppingListRecord } from '@/lib/db/procedures/shopping-list';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
@@ -24,6 +25,7 @@ export function ShoppingListClient({
   const [panel, setPanel] = useState<{ mode: 'add' } | { mode: 'edit'; item: ShoppingListItemRecord } | null>(
     null,
   );
+  const [confirmedListId, setConfirmedListId] = useState<number | null>(null);
 
   return (
     <main className="container-fluid px-3 py-4 pb-5">
@@ -78,8 +80,12 @@ export function ShoppingListClient({
               {list.total_estimated_live ?? 0}
             </div>
           </div>
-          <ConfirmPurchaseButton shoppingListId={list.id} />
+          <ConfirmPurchaseButton shoppingListId={list.id} onConfirmed={setConfirmedListId} />
         </div>
+      ) : null}
+
+      {confirmedListId ? (
+        <SplitPanel shoppingListId={confirmedListId} onClose={() => setConfirmedListId(null)} />
       ) : null}
     </main>
   );
