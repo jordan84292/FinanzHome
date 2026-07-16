@@ -43,6 +43,7 @@ BEGIN
     SET v_base_percentage = FLOOR(10000 / v_member_count) / 100;
     SET v_remainder = 100.00 - (v_base_percentage * v_member_count);
 
+    SET v_done = 0;
     OPEN v_member_cursor;
     read_loop: LOOP
       FETCH v_member_cursor INTO v_member_id;
@@ -57,7 +58,7 @@ BEGIN
         SET v_percentage = v_base_percentage;
       END IF;
 
-      INSERT INTO shopping_list_splits (shopping_list_id, member_id, percentage, amount_owed)
+      INSERT IGNORE INTO shopping_list_splits (shopping_list_id, member_id, percentage, amount_owed)
       VALUES (p_shopping_list_id, v_member_id, v_percentage, ROUND(v_total * v_percentage / 100, 2));
     END LOOP;
     CLOSE v_member_cursor;
