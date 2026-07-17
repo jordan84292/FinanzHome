@@ -6,6 +6,7 @@ import './globals.css';
 import { Providers } from './providers';
 import { BottomNav } from '@/components/BottomNav';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
+import { OfflineBanner } from '@/components/OfflineBanner';
 
 const fraunces = Fraunces({
   subsets: ['latin'],
@@ -33,6 +34,7 @@ export default function RootLayout({
     <html lang="es" data-bs-theme="dark">
       <body className={`${fraunces.variable} pb-5`}>
         <Providers>
+          <OfflineBanner />
           {children}
           <BottomNav />
           <ServiceWorkerRegister />
