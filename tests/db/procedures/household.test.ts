@@ -5,6 +5,7 @@ import {
   createHousehold,
   createInvitation,
   getHouseholdsForUser,
+  listHouseholdMembers,
 } from '@/lib/db/procedures/household';
 import { uniqueSuffix } from '../../helpers/db';
 
@@ -108,5 +109,46 @@ describe('household procedures', () => {
         displayName: 'Invitee',
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe('sp_household_member_list', () => {
+  it('lists every member of a household with their display name and role', async () => {
+    const suffix = uniqueSuffix();
+    const user = await registerUser({
+      email: `member_list_owner_${suffix}@example.com`,
+      passwordHash: 'hash',
+      name: 'Owner',
+    });
+    const household = await createHousehold({
+      name: `Casa MemberList ${suffix}`,
+      creatorUserId: user.id,
+      creatorDisplayName: 'Owner',
+    });
+    const secondUser = await registerUser({
+      email: `member_list_second_${suffix}@example.com`,
+      passwordHash: 'hash',
+      name: 'Second',
+    });
+    const [ownerMembership] = await getHouseholdsForUser(user.id);
+    const invitation = await createInvitation({
+      householdId: household.id,
+      email: secondUser.email,
+      token: `member-list-token-${suffix}`,
+      invitedByMemberId: ownerMembership.member_id,
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+    await acceptInvitation({ token: invitation.token, userId: secondUser.id, displayName: 'Second' });
+
+    const members = await listHouseholdMembers(household.id);
+
+    expect(members).toHaveLength(2);
+    expect(members.map((m) => m.display_name).sort()).toEqual(['Owner', 'Second']);
+    expect(members.find((m) => m.display_name === 'Owner')?.role).toBe('owner');
+  });
+
+  it('returns an empty array for a household with a bad id', async () => {
+    const members = await listHouseholdMembers(999_999_999);
+    expect(members).toHaveLength(0);
   });
 });

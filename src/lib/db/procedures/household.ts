@@ -81,3 +81,7 @@ export async function acceptInvitation(params: {
 export async function getHouseholdsForUser(userId: number): Promise<HouseholdForUserRecord[]> {
   return callProcedure<HouseholdForUserRecord>('sp_household_get_for_user', [userId]);
 }
+
+export async function listHouseholdMembers(householdId: number): Promise<HouseholdMemberRecord[]> {
+  return callProcedure<HouseholdMemberRecord>('sp_household_member_list', [householdId]);
+}
