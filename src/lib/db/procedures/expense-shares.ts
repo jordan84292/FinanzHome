@@ -10,6 +10,21 @@ export interface ExpenseShareRecord extends RowDataPacket {
   percentage: number;
 }
 
+/**
+ * Read-only snapshot of the default split copied onto a single expense
+ * occurrence at generation time (sp_expense_occurrence_shares_snapshot).
+ * No wrapper function reads this yet — deferred to a future phase's
+ * dashboard (Fase 8), which will query expense_occurrence_shares directly.
+ */
+export interface ExpenseOccurrenceShareRecord extends RowDataPacket {
+  id: number;
+  occurrence_id: number;
+  member_id: number;
+  display_name: string;
+  percentage: number;
+  amount_owed: number;
+}
+
 export async function listRecurringExpenseShares(
   recurringExpenseId: number,
   householdId: number,

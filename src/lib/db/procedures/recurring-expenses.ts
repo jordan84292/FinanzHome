@@ -89,7 +89,11 @@ export async function createRecurringExpense(params: {
       params.createdByMemberId,
     ]);
     const recurringExpense = rows[0];
-    await call('sp_expense_occurrence_generate_next', [recurringExpense.id, params.householdId]);
+    const occurrenceRows = await call<ExpenseOccurrenceRecord>('sp_expense_occurrence_generate_next', [
+      recurringExpense.id,
+      params.householdId,
+    ]);
+    await call('sp_expense_occurrence_shares_snapshot', [occurrenceRows[0].id, params.householdId]);
     return recurringExpense;
   });
 }
@@ -155,10 +159,11 @@ export async function markOccurrencePaid(params: {
       params.paidByMemberId,
     ]);
     const paidOccurrence = rows[0];
-    await call('sp_expense_occurrence_generate_next', [
+    const nextOccurrenceRows = await call<ExpenseOccurrenceRecord>('sp_expense_occurrence_generate_next', [
       paidOccurrence.recurring_expense_id,
       params.householdId,
     ]);
+    await call('sp_expense_occurrence_shares_snapshot', [nextOccurrenceRows[0].id, params.householdId]);
     return call<ExpenseOccurrenceRecord>('sp_expense_occurrence_list', [
       paidOccurrence.recurring_expense_id,
       params.householdId,

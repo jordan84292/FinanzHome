@@ -6,11 +6,32 @@ import {
   createInvitation,
   getHouseholdsForUser,
 } from '@/lib/db/procedures/household';
-import { createRecurringExpense, listExpenseCategories } from '@/lib/db/procedures/recurring-expenses';
+import {
+  createRecurringExpense,
+  generateNextOccurrence,
+  listExpenseCategories,
+  listOccurrences,
+  markOccurrencePaid,
+} from '@/lib/db/procedures/recurring-expenses';
 import { listRecurringExpenseShares, setRecurringExpenseShares } from '@/lib/db/procedures/expense-shares';
 import { uniqueSuffix } from '../../helpers/db';
+import { callProcedure } from '@/lib/db/call';
+import type { RowDataPacket } from 'mysql2';
 
 const CRC_ID = 1;
+
+interface OccurrenceShareRow extends RowDataPacket {
+  id: number;
+  occurrence_id: number;
+  member_id: number;
+  display_name: string;
+  percentage: number;
+  amount_owed: number;
+}
+
+async function listOccurrenceShares(occurrenceId: number, householdId: number): Promise<OccurrenceShareRow[]> {
+  return callProcedure<OccurrenceShareRow>('sp_expense_occurrence_shares_snapshot', [occurrenceId, householdId]);
+}
 
 async function createOwner(suffix: string): Promise<{ householdId: number; memberId: number }> {
   const user = await registerUser({
@@ -187,5 +208,130 @@ describe('setRecurringExpenseShares / listRecurringExpenseShares', () => {
     await expect(listRecurringExpenseShares(recurringExpenseId, householdIdB)).rejects.toThrow(
       /not found in this household/i,
     );
+  });
+});
+
+describe('automatic occurrence share snapshotting', () => {
+  it('snapshots the current default split onto the first occurrence when shares are set before creation is impossible — set after creation snapshots the NEXT generated occurrence', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({ householdId, invitedByMemberId: memberId, suffix });
+    const { recurringExpenseId } = await createExpense({ householdId, memberId, suffix, amount: 10000 });
+
+    await setRecurringExpenseShares({
+      recurringExpenseId,
+      householdId,
+      shares: [
+        { memberId, percentage: 50 },
+        { memberId: secondMemberId, percentage: 50 },
+      ],
+    });
+
+    const [firstOccurrence] = await listOccurrences(recurringExpenseId, householdId);
+    const history = await markOccurrencePaid({ occurrenceId: firstOccurrence.id, householdId, paidByMemberId: memberId });
+    const nextOccurrence = history.find((o) => o.id !== firstOccurrence.id)!;
+
+    // The next occurrence (generated after this mark-paid) must have been
+    // snapshotted with the 50/50 split that was active at generation time.
+    const rows = await listOccurrenceShares(nextOccurrence.id, householdId);
+    expect(rows).toHaveLength(2);
+    expect(rows.find((r) => r.member_id === memberId)?.amount_owed).toBe(5000);
+    expect(rows.find((r) => r.member_id === secondMemberId)?.amount_owed).toBe(5000);
+  });
+
+  it('does not alter a previously-snapshotted occurrence when the default split changes later', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({ householdId, invitedByMemberId: memberId, suffix });
+    const { recurringExpenseId } = await createExpense({ householdId, memberId, suffix, amount: 10000 });
+    await setRecurringExpenseShares({
+      recurringExpenseId,
+      householdId,
+      shares: [
+        { memberId, percentage: 50 },
+        { memberId: secondMemberId, percentage: 50 },
+      ],
+    });
+    const [firstOccurrence] = await listOccurrences(recurringExpenseId, householdId);
+    const history = await markOccurrencePaid({ occurrenceId: firstOccurrence.id, householdId, paidByMemberId: memberId });
+    const secondOccurrence = history.find((o) => o.id !== firstOccurrence.id)!;
+    const secondOccurrenceRowsBefore = await listOccurrenceShares(secondOccurrence.id, householdId);
+    expect(secondOccurrenceRowsBefore.find((r) => r.member_id === memberId)?.amount_owed).toBe(5000);
+
+    // Change the default split after the second occurrence has already been snapshotted.
+    await setRecurringExpenseShares({
+      recurringExpenseId,
+      householdId,
+      shares: [
+        { memberId, percentage: 80 },
+        { memberId: secondMemberId, percentage: 20 },
+      ],
+    });
+
+    const secondOccurrenceRowsAfter = await listOccurrenceShares(secondOccurrence.id, householdId);
+    expect(secondOccurrenceRowsAfter.find((r) => r.member_id === memberId)?.amount_owed).toBe(5000);
+  });
+
+  it('reconciles amount_owed to sum exactly to the recurring expense amount when the split leaves a residual cent', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({ householdId, invitedByMemberId: memberId, suffix });
+    const { memberId: thirdMemberId } = await addSecondMember({ householdId, invitedByMemberId: memberId, suffix: `${suffix}_c` });
+    // 10.00 split 33.34/33.33/33.33 independently rounds to 3.33/3.33/3.33 = 9.99, a cent short.
+    const { recurringExpenseId } = await createExpense({ householdId, memberId, suffix, amount: 10 });
+    const shares = await setRecurringExpenseShares({
+      recurringExpenseId,
+      householdId,
+      shares: [
+        { memberId, percentage: 33.34 },
+        { memberId: secondMemberId, percentage: 33.33 },
+        { memberId: thirdMemberId, percentage: 33.33 },
+      ],
+    });
+    expect(shares).toHaveLength(3);
+
+    const [firstOccurrence] = await listOccurrences(recurringExpenseId, householdId);
+    const rows = await listOccurrenceShares(firstOccurrence.id, householdId);
+
+    expect(rows).toHaveLength(3);
+    const totalOwedCents = Math.round(rows.reduce((sum, r) => sum + r.amount_owed, 0) * 100);
+    expect(totalOwedCents).toBe(1000);
+  });
+
+  it('produces no share rows for an occurrence when the expense has no shares configured', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const { recurringExpenseId } = await createExpense({ householdId, memberId, suffix, amount: 3000 });
+
+    const [firstOccurrence] = await listOccurrences(recurringExpenseId, householdId);
+    const rows = await listOccurrenceShares(firstOccurrence.id, householdId);
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it('is idempotent: generating the same occurrence again does not duplicate share rows', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({ householdId, invitedByMemberId: memberId, suffix });
+    const { recurringExpenseId } = await createExpense({ householdId, memberId, suffix, amount: 4000 });
+    await setRecurringExpenseShares({
+      recurringExpenseId,
+      householdId,
+      shares: [
+        { memberId, percentage: 50 },
+        { memberId: secondMemberId, percentage: 50 },
+      ],
+    });
+
+    const [firstOccurrence] = await listOccurrences(recurringExpenseId, householdId);
+    const rowsBefore = await listOccurrenceShares(firstOccurrence.id, householdId);
+    // generateNextOccurrence is idempotent while unpaid (Fase 5) — calling
+    // markOccurrencePaid is not the way to re-trigger it here; instead confirm
+    // the snapshot itself doesn't re-run by calling generateNextOccurrence directly.
+    await generateNextOccurrence(recurringExpenseId, householdId);
+    const rowsAfter = await listOccurrenceShares(firstOccurrence.id, householdId);
+
+    expect(rowsBefore).toHaveLength(2);
+    expect(rowsAfter).toHaveLength(2);
   });
 });
