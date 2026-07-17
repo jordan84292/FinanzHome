@@ -17,12 +17,14 @@ export function ExpenseDetailPanel({
   onDeactivated: () => void;
 }) {
   const [occurrences, setOccurrences] = useState<ExpenseOccurrenceRecord[] | null>(null);
+  const [hasError, setHasError] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     getOccurrencesAction(expense.id).then((result) => {
       if (result.error) {
         showError(result.error);
+        setHasError(true);
         return;
       }
       setOccurrences(result.occurrences);
@@ -82,7 +84,9 @@ export function ExpenseDetailPanel({
         ) : null}
 
         <h3 className="h6 text-body-secondary text-uppercase">Historial</h3>
-        {occurrences === null ? (
+        {hasError ? (
+          <p className="text-body-secondary">No se pudo cargar el historial.</p>
+        ) : occurrences === null ? (
           <p className="text-body-secondary">Cargando…</p>
         ) : (
           <ul className="list-group">

@@ -43,6 +43,12 @@ BEGIN
         INSERT INTO expense_occurrences (recurring_expense_id, period_start, period_end, due_date)
         VALUES (p_recurring_expense_id, v_first_due_date, v_first_due_date, v_first_due_date);
       END IF;
+    -- NOTE (weekly & biweekly): the next occurrence's due_date is anchored to the
+    -- previous occurrence's schedule (last_period_end / last_due_date), never to
+    -- CURDATE(). If a cycle is marked paid long after it was due, the freshly
+    -- generated next occurrence can itself already be in the past (immediately
+    -- "vencido"). This is intentional: every skipped cycle is still owed, so the
+    -- debt must not be silently forgiven or reset to "today".
     ELSEIF v_periodicity = 'weekly' THEN
       SELECT MAX(period_end) INTO v_last_period_end
       FROM expense_occurrences

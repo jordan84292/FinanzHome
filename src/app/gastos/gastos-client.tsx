@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { RecurringExpenseRow } from '@/components/gastos/RecurringExpenseRow';
 import { RecurringExpenseForm } from '@/components/gastos/RecurringExpenseForm';
 import { ExpenseDetailPanel } from '@/components/gastos/ExpenseDetailPanel';
+import { showError } from '@/lib/ui/alerts';
 import { deactivateRecurringExpenseAction } from './actions';
 import type { ExpenseCategoryRecord, RecurringExpenseRecord } from '@/lib/db/procedures/recurring-expenses';
 import type { HouseholdMemberRecord } from '@/lib/db/procedures/household';
@@ -79,7 +80,9 @@ export function GastosClient({
           onClose={() => setPanel(null)}
           onEdit={() => setPanel({ mode: 'edit', expense: panel.expense })}
           onDeactivated={() => {
-            deactivateRecurringExpenseAction(panel.expense.id).then(() => setPanel(null));
+            deactivateRecurringExpenseAction(panel.expense.id)
+              .then(() => setPanel(null))
+              .catch(() => showError('No se pudo desactivar el gasto. Intentá de nuevo.'));
           }}
         />
       ) : null}

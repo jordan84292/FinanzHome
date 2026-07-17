@@ -17,6 +17,14 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Expense occurrence not found in this household';
   END IF;
 
+  SELECT COUNT(*) INTO v_exists
+  FROM household_members
+  WHERE id = p_paid_by_member_id AND household_id = p_household_id;
+
+  IF v_exists = 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Paid-by member not found in this household';
+  END IF;
+
   -- The `AND is_paid = 0` guard makes this idempotent: a repeated call (e.g. a
   -- double-tap on the button) does not overwrite paid_by_member_id/paid_at.
   UPDATE expense_occurrences

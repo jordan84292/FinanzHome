@@ -23,7 +23,7 @@ const createRecurringExpenseSchema = z
     periodicity: periodicitySchema,
     dueDayConfig: z.coerce.number().int().min(1).max(7).optional(),
     withdrawalDay: z.coerce.number().int().min(1).max(31).optional(),
-    firstDueDate: z.string().min(1).optional(),
+    firstDueDate: z.iso.date('Fecha inválida').optional(),
     responsibleMemberId: z.coerce.number().int().positive(),
   })
   .superRefine((data, ctx) => {

@@ -508,6 +508,44 @@ describe('sp_expense_occurrence_mark_paid / markOccurrencePaid', () => {
     expect(new Date(next!.due_date).getTime()).toBeGreaterThan(new Date(paid!.due_date).getTime());
   });
 
+  it('anchors the next cycle to the schedule, not to today, so late payments do not silently forgive skipped cycles', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const [category] = await listExpenseCategories();
+    const expense = await createRecurringExpense({
+      householdId,
+      name: `Anclaje quincenal ${suffix}`,
+      categoryId: category.id,
+      amount: 4500,
+      currencyId: CRC_ID,
+      periodicity: 'biweekly',
+      dueDayConfig: null,
+      withdrawalDay: 18,
+      firstDueDate: null,
+      responsibleMemberId: memberId,
+      createdByMemberId: memberId,
+    });
+    const [firstOccurrence] = await listOccurrences(expense.id, householdId);
+
+    const history = await markOccurrencePaid({
+      occurrenceId: firstOccurrence.id,
+      householdId,
+      paidByMemberId: memberId,
+    });
+
+    const paid = history.find((o) => o.id === firstOccurrence.id);
+    const next = history.find((o) => o.id !== firstOccurrence.id);
+    // sp_expense_occurrence_generate_next anchors the next due_date on the
+    // *previous* occurrence's due_date, not on CURDATE(). Whether this call
+    // happens right on time or weeks late, the next cycle always lands exactly
+    // 14 days after the paid one — so a very late mark-paid can produce a next
+    // occurrence that is already overdue. That's intentional: skipped cycles
+    // are still owed and must not be reset to "today" or forgiven.
+    const [y, m, d] = paid!.due_date.slice(0, 10).split('-').map(Number);
+    const expectedNextDueDate = new Date(Date.UTC(y, m - 1, d + 14)).toISOString().slice(0, 10);
+    expect(next!.due_date.slice(0, 10)).toBe(expectedNextDueDate);
+  });
+
   it('does not generate a second occurrence for one_time expenses once paid', async () => {
     const suffix = uniqueSuffix();
     const { householdId, memberId } = await createOwner(suffix);
@@ -593,6 +631,32 @@ describe('sp_expense_occurrence_mark_paid / markOccurrencePaid', () => {
 
     await expect(
       markOccurrencePaid({ occurrenceId: firstOccurrence.id, householdId: householdIdB, paidByMemberId: memberIdB }),
+    ).rejects.toThrow(/not found in this household/i);
+  });
+
+  it('rejects a paid-by member that does not belong to the occurrence household', async () => {
+    const suffixA = uniqueSuffix();
+    const suffixB = uniqueSuffix();
+    const { householdId: householdIdA, memberId: memberIdA } = await createOwner(suffixA);
+    const { memberId: memberIdB } = await createOwner(suffixB);
+    const [category] = await listExpenseCategories();
+    const expense = await createRecurringExpense({
+      householdId: householdIdA,
+      name: `Cross paid-by ${suffixA}`,
+      categoryId: category.id,
+      amount: 3000,
+      currencyId: CRC_ID,
+      periodicity: 'one_time',
+      dueDayConfig: null,
+      withdrawalDay: null,
+      firstDueDate: '2026-10-01',
+      responsibleMemberId: memberIdA,
+      createdByMemberId: memberIdA,
+    });
+    const [firstOccurrence] = await listOccurrences(expense.id, householdIdA);
+
+    await expect(
+      markOccurrencePaid({ occurrenceId: firstOccurrence.id, householdId: householdIdA, paidByMemberId: memberIdB }),
     ).rejects.toThrow(/not found in this household/i);
   });
 });
