@@ -69,6 +69,7 @@ export function GastosClient({
               categories={categories}
               members={members}
               currencies={currencies}
+              onSuccess={() => setPanel(null)}
             />
           </div>
         </div>

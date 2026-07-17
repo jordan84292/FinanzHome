@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState, useEffect, useTransition } from 'react';
+import { useActionState, useState, useEffect, useRef, useTransition } from 'react';
 import {
   createRecurringExpenseAction,
   updateRecurringExpenseAction,
@@ -131,18 +131,29 @@ export function RecurringExpenseForm({
   categories,
   members,
   currencies,
+  onSuccess,
 }: {
   mode: 'create' | 'edit';
   expense?: RecurringExpenseRecord;
   categories: ExpenseCategoryRecord[];
   members: HouseholdMemberRecord[];
   currencies: CurrencyRecord[];
+  onSuccess?: () => void;
 }) {
   const action = mode === 'create' ? createRecurringExpenseAction : updateRecurringExpenseAction;
   const [state, formAction, pending] = useActionState(action, initialState);
   const [periodicity, setPeriodicity] = useState<'weekly' | 'biweekly' | 'one_time'>(
     expense?.periodicity ?? 'weekly',
   );
+  const wasPending = useRef(false);
+
+  useEffect(() => {
+    if (wasPending.current && !pending && !state.error) {
+      showSuccess(mode === 'create' ? 'Gasto agregado.' : 'Cambios guardados.');
+      onSuccess?.();
+    }
+    wasPending.current = pending;
+  }, [pending, state, mode, onSuccess]);
 
   return (
     <form action={formAction} className="d-flex flex-column gap-3">
