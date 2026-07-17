@@ -19,6 +19,17 @@ export const metadata: Metadata = {
   title: 'FinanzHome',
   description: 'Inventario, compras y finanzas del hogar',
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'FinanzHome',
+  },
+  // Next's appleWebApp.capable only emits the modern "mobile-web-app-capable"
+  // meta tag; older iOS Safari versions (pre-17.4) only honor the legacy
+  // "apple-" prefixed one, so it's added explicitly here too.
+  other: {
+    'apple-mobile-web-app-capable': 'yes',
+  },
 };
 
 export const viewport = {
