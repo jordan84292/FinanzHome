@@ -1,15 +1,18 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect, useRef } from 'react';
 import {
   createProductAction,
   updateProductAction,
   type CreateProductState,
   type UpdateProductState,
 } from '@/app/inventario/actions';
+import { showSuccess } from '@/lib/ui/alerts';
 import { CurrencyAmountInput } from '@/components/CurrencyAmountInput';
 import type { ProductCategoryRecord, ProductRecord, UnitOfMeasureRecord } from '@/lib/db/procedures/products';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
+
+const CRC_ID = 1;
 
 const initialState: CreateProductState | UpdateProductState = { error: null };
 
@@ -19,15 +22,26 @@ export function ProductForm({
   categories,
   units,
   currencies,
+  onSuccess,
 }: {
   mode: 'create' | 'edit';
   product?: ProductRecord;
   categories: ProductCategoryRecord[];
   units: UnitOfMeasureRecord[];
   currencies: CurrencyRecord[];
+  onSuccess?: () => void;
 }) {
   const action = mode === 'create' ? createProductAction : updateProductAction;
   const [state, formAction, pending] = useActionState(action, initialState);
+  const wasPending = useRef(false);
+
+  useEffect(() => {
+    if (wasPending.current && !pending && !state.error) {
+      showSuccess(mode === 'create' ? 'Producto agregado.' : 'Cambios guardados.');
+      onSuccess?.();
+    }
+    wasPending.current = pending;
+  }, [pending, state, mode, onSuccess]);
 
   return (
     <form action={formAction} className="d-flex flex-column gap-3">
@@ -90,7 +104,7 @@ export function ProductForm({
           currencyName="defaultPriceCurrencyId"
           currencies={currencies}
           defaultAmount={product?.default_price}
-          defaultCurrencyId={product?.default_price_currency_id}
+          defaultCurrencyId={product?.default_price_currency_id ?? CRC_ID}
         />
       </div>
       {state.error ? (

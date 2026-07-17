@@ -14,6 +14,7 @@ import {
 import {
   getSplit,
   initSplit,
+  markSplitPaid,
   updateSplit,
   type ShoppingListSplitRecord,
 } from '@/lib/db/procedures/shopping-list-splits';
@@ -202,5 +203,21 @@ export async function updateSplitAction(
     return { splits, error: null };
   } catch {
     return { splits: [], error: 'Los porcentajes deben sumar 100%.' };
+  }
+}
+
+export interface MarkSplitPaidState {
+  split: ShoppingListSplitRecord | null;
+  error: string | null;
+}
+
+export async function markSplitPaidAction(splitId: number, isPaid: boolean): Promise<MarkSplitPaidState> {
+  const membership = await requireMembership();
+  try {
+    const split = await markSplitPaid({ splitId, householdId: membership.id, isPaid });
+    revalidatePath('/compras/pagos');
+    return { split, error: null };
+  } catch {
+    return { split: null, error: 'No se pudo actualizar el pago.' };
   }
 }

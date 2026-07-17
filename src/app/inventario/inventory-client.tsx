@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 import { ProductRow } from '@/components/inventory/ProductRow';
 import { ProductForm } from '@/components/inventory/ProductForm';
+import { deactivateProductAction } from './actions';
+import { showError } from '@/lib/ui/alerts';
 import type { ProductCategoryRecord, ProductRecord, UnitOfMeasureRecord } from '@/lib/db/procedures/products';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
 
@@ -31,6 +33,15 @@ export function InventoryClient({
     return map;
   }, [products]);
 
+  function handleDelete(product: ProductRecord): void {
+    if (!window.confirm(`¿Eliminar "${product.name}"? Podés volver a agregarlo después si hace falta.`)) {
+      return;
+    }
+    deactivateProductAction(product.id).catch(() => {
+      showError('No se pudo eliminar el producto. Intentá de nuevo.');
+    });
+  }
+
   return (
     <main className="container-fluid px-3 py-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
@@ -49,7 +60,9 @@ export function InventoryClient({
               <ProductRow
                 key={product.id}
                 product={product}
+                currencies={currencies}
                 onEdit={() => setPanel({ mode: 'edit', product })}
+                onDelete={() => handleDelete(product)}
               />
             ))}
           </ul>
@@ -76,6 +89,7 @@ export function InventoryClient({
               categories={categories}
               units={units}
               currencies={currencies}
+              onSuccess={() => setPanel(null)}
             />
           </div>
         </div>

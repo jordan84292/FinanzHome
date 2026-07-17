@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { ShoppingListItemRow } from '@/components/shopping-list/ShoppingListItemRow';
 import { ShoppingListItemForm } from '@/components/shopping-list/ShoppingListItemForm';
 import { ConfirmPurchaseButton } from './confirm-purchase-button';
@@ -74,15 +75,21 @@ export function ShoppingListClient({
     <main className="container-fluid px-3 py-4 pb-5">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h1 className="h4 mb-0">Lista de compras</h1>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          disabled={!isOnline}
-          onClick={() => setPanel({ mode: 'add' })}
-        >
-          <i className="bi bi-plus-lg me-1" />
-          Producto
-        </button>
+        <div className="d-flex gap-2">
+          <Link href="/compras/pagos" className="btn btn-outline-secondary btn-sm">
+            <i className="bi bi-cash-coin me-1" />
+            Pagos
+          </Link>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={!isOnline}
+            onClick={() => setPanel({ mode: 'add' })}
+          >
+            <i className="bi bi-plus-lg me-1" />
+            Producto
+          </button>
+        </div>
       </div>
 
       <ul className="list-group mb-4">

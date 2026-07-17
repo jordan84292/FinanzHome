@@ -45,7 +45,7 @@ BEGIN
     LIMIT 1;
   END IF;
 
-  SELECT sls.id, sls.shopping_list_id, sls.member_id, hm.display_name, sls.percentage, sls.amount_owed
+  SELECT sls.id, sls.shopping_list_id, sls.member_id, hm.display_name, sls.percentage, sls.amount_owed, sls.is_paid, sls.paid_at
   FROM shopping_list_splits sls
   INNER JOIN household_members hm ON hm.id = sls.member_id
   WHERE sls.shopping_list_id = p_shopping_list_id

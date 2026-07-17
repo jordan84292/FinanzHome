@@ -4,14 +4,20 @@ import { useTransition } from 'react';
 import { updateCurrentQuantityAction } from '@/app/inventario/actions';
 import { showError } from '@/lib/ui/alerts';
 import type { ProductRecord } from '@/lib/db/procedures/products';
+import type { CurrencyRecord } from '@/lib/db/procedures/currency';
 
 export function ProductRow({
   product,
   onEdit,
+  onDelete,
+  currencies,
 }: {
   product: ProductRecord;
   onEdit: () => void;
+  onDelete: () => void;
+  currencies: CurrencyRecord[];
 }) {
+  const currencySymbol = currencies.find((c) => c.id === product.default_price_currency_id)?.symbol ?? '';
   const [isPending, startTransition] = useTransition();
 
   function adjust(delta: number): void {
@@ -45,6 +51,13 @@ export function ProductRow({
         <div className="fw-semibold">{product.name}</div>
         <div className="text-body-secondary small">
           {product.current_quantity} / {product.optimal_quantity} {product.unit_code}
+          {product.default_price !== null ? (
+            <>
+              {' · '}
+              {currencySymbol}
+              {product.default_price}
+            </>
+          ) : null}
         </div>
       </button>
       <div className="d-flex align-items-center gap-2">
@@ -65,6 +78,15 @@ export function ProductRow({
           aria-label="Sumar uno"
         >
           <i className="bi bi-plus" />
+        </button>
+        <button
+          type="button"
+          className="btn btn-outline-danger btn-sm"
+          disabled={isPending}
+          onClick={onDelete}
+          aria-label="Eliminar producto"
+        >
+          <i className="bi bi-trash" />
         </button>
       </div>
     </li>

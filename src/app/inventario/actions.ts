@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireMembership } from '@/lib/household/require-membership';
-import { createProduct, updateCurrentQuantity, updateProduct } from '@/lib/db/procedures/products';
+import { createProduct, deactivateProduct, updateCurrentQuantity, updateProduct } from '@/lib/db/procedures/products';
 
 export async function updateCurrentQuantityAction(productId: number, quantity: number): Promise<void> {
   const membership = await requireMembership();
@@ -114,4 +114,10 @@ export async function updateProductAction(
 
   revalidatePath('/inventario');
   return { error: null };
+}
+
+export async function deactivateProductAction(productId: number): Promise<void> {
+  const membership = await requireMembership();
+  await deactivateProduct(productId, membership.id);
+  revalidatePath('/inventario');
 }
