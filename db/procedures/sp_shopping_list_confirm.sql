@@ -17,6 +17,7 @@ BEGIN
   DECLARE v_product_id INT UNSIGNED;
   DECLARE v_rate DECIMAL(12,4);
   DECLARE v_total DECIMAL(12,2) DEFAULT 0;
+  DECLARE v_raw JSON;
 
   SELECT COUNT(*) INTO v_exists
   FROM shopping_lists
@@ -35,17 +36,24 @@ BEGIN
   SET v_len = JSON_LENGTH(p_items_json);
 
   WHILE v_i < v_len DO
-    -- NOTE: JSON_VALUE (not JSON_EXTRACT) for these scalar CASTs. Verified against
-    -- MariaDB 10.4.32 that CAST(JSON_EXTRACT(<json null>) AS UNSIGNED/DECIMAL) yields
-    -- 0 / 0.00, not SQL NULL (JSON_EXTRACT('null') -> the string 'null' -> non-numeric
-    -- string conversion -> 0). That silently wrote unit_price_currency_id = 0 for items
-    -- with no price/currency (e.g. a product with no default price), violating the
-    -- currencies FK. JSON_VALUE correctly yields SQL NULL for a JSON null and is
-    -- otherwise equivalent for scalar extraction.
-    SET v_item_id = CAST(JSON_VALUE(p_items_json, CONCAT('$[', v_i, '].itemId')) AS UNSIGNED);
-    SET v_quantity = CAST(JSON_VALUE(p_items_json, CONCAT('$[', v_i, '].quantity')) AS DECIMAL(10,2));
-    SET v_unit_price = CAST(JSON_VALUE(p_items_json, CONCAT('$[', v_i, '].unitPrice')) AS DECIMAL(12,2));
-    SET v_unit_price_currency_id = CAST(JSON_VALUE(p_items_json, CONCAT('$[', v_i, '].unitPriceCurrencyId')) AS UNSIGNED);
+    -- NOTE: JSON_VALUE can't be used here — it requires a literal path in MySQL
+    -- 8 (rejects the dynamic CONCAT('$[', v_i, ']...') path this loop needs),
+    -- while MariaDB allows it. JSON_EXTRACT accepts a dynamic path on both
+    -- engines but, unlike JSON_VALUE, doesn't collapse a JSON `null` into SQL
+    -- NULL under CAST — CAST(JSON_EXTRACT(<json null>) AS UNSIGNED/DECIMAL)
+    -- silently yields 0 / 0.00 instead, which would write
+    -- unit_price_currency_id = 0 for an item with no price/currency (e.g. a
+    -- product with no default price), violating the currencies FK. Guarding
+    -- with JSON_TYPE(...) = 'NULL' restores the correct NULL behavior on both
+    -- MariaDB and MySQL 8 — verified against both.
+    SET v_raw = JSON_EXTRACT(p_items_json, CONCAT('$[', v_i, '].itemId'));
+    SET v_item_id = IF(JSON_TYPE(v_raw) = 'NULL', NULL, CAST(JSON_UNQUOTE(v_raw) AS UNSIGNED));
+    SET v_raw = JSON_EXTRACT(p_items_json, CONCAT('$[', v_i, '].quantity'));
+    SET v_quantity = IF(JSON_TYPE(v_raw) = 'NULL', NULL, CAST(JSON_UNQUOTE(v_raw) AS DECIMAL(10,2)));
+    SET v_raw = JSON_EXTRACT(p_items_json, CONCAT('$[', v_i, '].unitPrice'));
+    SET v_unit_price = IF(JSON_TYPE(v_raw) = 'NULL', NULL, CAST(JSON_UNQUOTE(v_raw) AS DECIMAL(12,2)));
+    SET v_raw = JSON_EXTRACT(p_items_json, CONCAT('$[', v_i, '].unitPriceCurrencyId'));
+    SET v_unit_price_currency_id = IF(JSON_TYPE(v_raw) = 'NULL', NULL, CAST(JSON_UNQUOTE(v_raw) AS UNSIGNED));
 
     SET v_product_id = NULL;
     SELECT product_id INTO v_product_id

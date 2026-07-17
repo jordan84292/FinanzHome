@@ -36,7 +36,11 @@ BEGIN
   DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
 
   DROP TEMPORARY TABLE IF EXISTS tmp_pending_reminders;
+  -- id/PRIMARY KEY exists only to satisfy hosts that enforce
+  -- sql_require_primary_key (e.g. Aiven) on every table including TEMPORARY
+  -- ones; nothing in this procedure reads it.
   CREATE TEMPORARY TABLE tmp_pending_reminders (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     occurrence_id INT UNSIGNED NOT NULL,
     recurring_expense_id INT UNSIGNED NOT NULL,
     member_id INT UNSIGNED NOT NULL,
