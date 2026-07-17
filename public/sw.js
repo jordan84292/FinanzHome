@@ -28,6 +28,11 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => cached);
 
+      // Sin esto, el navegador puede terminar el service worker apenas
+      // respondWith resuelve con la respuesta cacheada, sin garantizar que
+      // el refresco de cache en segundo plano llegue a completarse.
+      event.waitUntil(network);
+
       return cached || network;
     }),
   );
