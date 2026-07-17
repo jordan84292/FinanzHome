@@ -5,6 +5,7 @@ import { getUserProfile } from '@/lib/db/procedures/profile';
 import { PaymentScheduleForm } from './payment-schedule-form';
 import { logoutAction } from './actions';
 import { InstallPromptButton } from '@/components/InstallPromptButton';
+import { TelegramLinkSection } from '@/components/TelegramLinkSection';
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -26,6 +27,9 @@ export default async function ProfilePage() {
       <Link href="/hogar/miembros" className="btn btn-outline-primary w-100">
         Gestionar miembros del hogar
       </Link>
+
+      <h2 className="h6 text-body-secondary text-uppercase mt-4 mb-3">Recordatorios</h2>
+      <TelegramLinkSection />
 
       <h2 className="h6 text-body-secondary text-uppercase mt-4 mb-3">Instalación</h2>
       <InstallPromptButton />

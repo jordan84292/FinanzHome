@@ -1,8 +1,10 @@
 'use server';
 
+import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { auth, signOut } from '@/auth';
 import { updatePaymentSchedule } from '@/lib/db/procedures/profile';
+import { getTelegramStatus, setTelegramLinkToken } from '@/lib/db/procedures/telegram';
 
 const paymentScheduleSchema = z.discriminatedUnion('paymentFrequency', [
   z.object({
@@ -58,4 +60,45 @@ export async function updatePaymentScheduleAction(
 
 export async function logoutAction(): Promise<void> {
   await signOut({ redirectTo: '/login' });
+}
+
+export interface TelegramLinkState {
+  isLinked: boolean;
+  linkUrl: string | null;
+  error: string | null;
+}
+
+export async function getTelegramLinkStateAction(): Promise<TelegramLinkState> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { isLinked: false, linkUrl: null, error: 'Debés iniciar sesión' };
+  }
+
+  try {
+    const status = await getTelegramStatus(Number(session.user.id));
+    return { isLinked: status.is_linked === 1, linkUrl: null, error: null };
+  } catch {
+    return { isLinked: false, linkUrl: null, error: 'No se pudo consultar el estado de Telegram.' };
+  }
+}
+
+export async function generateTelegramLinkAction(): Promise<TelegramLinkState> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { isLinked: false, linkUrl: null, error: 'Debés iniciar sesión' };
+  }
+
+  try {
+    const status = await getTelegramStatus(Number(session.user.id));
+    if (status.is_linked === 1) {
+      return { isLinked: true, linkUrl: null, error: null };
+    }
+
+    const token = randomBytes(16).toString('hex');
+    await setTelegramLinkToken(Number(session.user.id), token);
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME;
+    return { isLinked: false, linkUrl: `https://t.me/${botUsername}?start=${token}`, error: null };
+  } catch {
+    return { isLinked: false, linkUrl: null, error: 'No se pudo generar el enlace de Telegram.' };
+  }
 }
