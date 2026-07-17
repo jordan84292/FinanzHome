@@ -6,7 +6,10 @@ import { requireMembership } from '@/lib/household/require-membership';
 import {
   createRecurringExpense,
   deactivateRecurringExpense,
+  listOccurrences,
+  markOccurrencePaid,
   updateRecurringExpense,
+  type ExpenseOccurrenceRecord,
 } from '@/lib/db/procedures/recurring-expenses';
 
 const periodicitySchema = z.enum(['weekly', 'biweekly', 'one_time']);
@@ -135,4 +138,39 @@ export async function deactivateRecurringExpenseAction(recurringExpenseId: numbe
   const membership = await requireMembership();
   await deactivateRecurringExpense(recurringExpenseId, membership.id);
   revalidatePath('/gastos');
+}
+
+export interface GetOccurrencesState {
+  occurrences: ExpenseOccurrenceRecord[];
+  error: string | null;
+}
+
+export async function getOccurrencesAction(recurringExpenseId: number): Promise<GetOccurrencesState> {
+  const membership = await requireMembership();
+  try {
+    const occurrences = await listOccurrences(recurringExpenseId, membership.id);
+    return { occurrences, error: null };
+  } catch {
+    return { occurrences: [], error: 'No se pudo cargar el historial de este gasto.' };
+  }
+}
+
+export interface MarkOccurrencePaidState {
+  occurrences: ExpenseOccurrenceRecord[];
+  error: string | null;
+}
+
+export async function markOccurrencePaidAction(occurrenceId: number): Promise<MarkOccurrencePaidState> {
+  const membership = await requireMembership();
+  try {
+    const occurrences = await markOccurrencePaid({
+      occurrenceId,
+      householdId: membership.id,
+      paidByMemberId: membership.member_id,
+    });
+    revalidatePath('/gastos');
+    return { occurrences, error: null };
+  } catch {
+    return { occurrences: [], error: 'No se pudo marcar el gasto como pagado.' };
+  }
 }

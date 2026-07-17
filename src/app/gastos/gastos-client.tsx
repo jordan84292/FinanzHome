@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { RecurringExpenseRow } from '@/components/gastos/RecurringExpenseRow';
 import { RecurringExpenseForm } from '@/components/gastos/RecurringExpenseForm';
+import { ExpenseDetailPanel } from '@/components/gastos/ExpenseDetailPanel';
+import { deactivateRecurringExpenseAction } from './actions';
 import type { ExpenseCategoryRecord, RecurringExpenseRecord } from '@/lib/db/procedures/recurring-expenses';
 import type { HouseholdMemberRecord } from '@/lib/db/procedures/household';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
@@ -69,6 +71,17 @@ export function GastosClient({
             />
           </div>
         </div>
+      ) : null}
+
+      {panel && panel.mode === 'detail' ? (
+        <ExpenseDetailPanel
+          expense={panel.expense}
+          onClose={() => setPanel(null)}
+          onEdit={() => setPanel({ mode: 'edit', expense: panel.expense })}
+          onDeactivated={() => {
+            deactivateRecurringExpenseAction(panel.expense.id).then(() => setPanel(null));
+          }}
+        />
       ) : null}
     </main>
   );
