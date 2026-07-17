@@ -27,20 +27,22 @@ export function ShoppingListClient({
     null,
   );
   const [confirmedListId, setConfirmedListId] = useState<number | null>(null);
-  const [liveList, setLiveList] = useState(list);
-  const [liveItems, setLiveItems] = useState(items);
+  const [offlineList, setOfflineList] = useState<ShoppingListRecord | null>(null);
+  const [offlineItems, setOfflineItems] = useState<ShoppingListItemRecord[] | null>(null);
   const isOnline = useOnlineStatus();
 
   useEffect(() => {
     if (isOnline) {
+      setOfflineList(null);
+      setOfflineItems(null);
       return;
     }
     fetch('/api/shopping-list/current')
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
         if (data) {
-          setLiveList(data.list);
-          setLiveItems(data.items);
+          setOfflineList(data.list);
+          setOfflineItems(data.items);
         }
       })
       .catch(() => {
@@ -48,6 +50,15 @@ export function ShoppingListClient({
         // que ya se renderizó desde el servidor.
       });
   }, [isOnline]);
+
+  useEffect(() => {
+    if (!isOnline) {
+      setPanel(null);
+    }
+  }, [isOnline]);
+
+  const displayList = offlineList ?? list;
+  const displayItems = offlineItems ?? items;
 
   return (
     <main className="container-fluid px-3 py-4 pb-5">
@@ -65,7 +76,7 @@ export function ShoppingListClient({
       </div>
 
       <ul className="list-group mb-4">
-        {liveItems.map((item) => (
+        {displayItems.map((item) => (
           <ShoppingListItemRow
             key={item.id}
             item={item}
@@ -75,7 +86,7 @@ export function ShoppingListClient({
         ))}
       </ul>
 
-      {liveItems.length === 0 ? (
+      {displayItems.length === 0 ? (
         <p className="text-body-secondary">No falta nada por ahora — tu inventario está al día.</p>
       ) : null}
 
@@ -91,7 +102,7 @@ export function ShoppingListClient({
             </div>
             <ShoppingListItemForm
               mode={panel.mode}
-              shoppingListId={liveList.id}
+              shoppingListId={displayList.id}
               item={panel.mode === 'edit' ? panel.item : undefined}
               products={products}
               currencies={currencies}
@@ -100,7 +111,7 @@ export function ShoppingListClient({
         </div>
       ) : null}
 
-      {liveItems.length > 0 ? (
+      {displayItems.length > 0 ? (
         <div
           className="position-fixed bottom-0 start-0 w-100 bg-body border-top p-3 d-flex justify-content-between align-items-center"
           style={{ zIndex: 1040 }}
@@ -109,11 +120,11 @@ export function ShoppingListClient({
             <div className="text-body-secondary small">Total estimado</div>
             <div className="h5 mb-0">
               {displayCurrencySymbol}
-              {liveList.total_estimated_live ?? 0}
+              {displayList.total_estimated_live ?? 0}
             </div>
           </div>
           <ConfirmPurchaseButton
-            shoppingListId={liveList.id}
+            shoppingListId={displayList.id}
             disabled={!isOnline}
             onConfirmed={setConfirmedListId}
           />
