@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
 
 export function CurrencyAmountInput({
@@ -13,32 +16,49 @@ export function CurrencyAmountInput({
   defaultAmount?: number | null;
   defaultCurrencyId?: number | null;
 }) {
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState(
+    defaultCurrencyId ?? currencies[0]?.id ?? null,
+  );
+  const selected = currencies.find((c) => c.id === selectedCurrencyId);
+
   return (
-    <div className="input-group">
-      <input
-        type="number"
-        step="0.01"
-        min={0}
-        name={amountName}
-        defaultValue={defaultAmount ?? undefined}
-        className="form-control"
-        placeholder="0.00"
-      />
-      <select
-        name={currencyName}
-        className="form-select flex-grow-0"
-        style={{ maxWidth: 100 }}
-        defaultValue={defaultCurrencyId ?? ''}
-      >
-        <option value="" disabled>
-          —
-        </option>
+    <div>
+      <div className="btn-group w-100 mb-2" role="group" aria-label="Moneda">
         {currencies.map((currency) => (
-          <option key={currency.id} value={currency.id}>
-            {currency.symbol} {currency.code}
-          </option>
+          <div key={currency.id} className="flex-fill">
+            <input
+              type="radio"
+              className="btn-check"
+              name={currencyName}
+              id={`${currencyName}-${currency.id}`}
+              value={currency.id}
+              autoComplete="off"
+              checked={selectedCurrencyId === currency.id}
+              onChange={() => setSelectedCurrencyId(currency.id)}
+            />
+            <label
+              htmlFor={`${currencyName}-${currency.id}`}
+              className={`btn w-100 ${selectedCurrencyId === currency.id ? 'btn-primary' : 'btn-outline-secondary'}`}
+            >
+              {currency.symbol} {currency.code}
+            </label>
+          </div>
         ))}
-      </select>
+      </div>
+      <div className="input-group">
+        <span className="input-group-text fw-semibold" style={{ minWidth: 44, justifyContent: 'center' }}>
+          {selected?.symbol ?? ''}
+        </span>
+        <input
+          type="number"
+          step="0.01"
+          min={0}
+          name={amountName}
+          defaultValue={defaultAmount ?? undefined}
+          className="form-control"
+          placeholder="0.00"
+        />
+      </div>
     </div>
   );
 }
