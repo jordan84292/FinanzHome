@@ -35,6 +35,16 @@ export function ShoppingListClient({
     if (isOnline) {
       setOfflineList(null);
       setOfflineItems(null);
+
+      // Mientras hay red, "calentamos" la cache del service worker pegándole
+      // al mismo endpoint que se lee offline — así, si más adelante se pierde
+      // la señal, ya hay algo cacheado para mostrar. La UI en sí no usa esta
+      // respuesta mientras está online (ya se está mostrando lo que el
+      // servidor ya renderizó); esto es puramente para calentar la cache.
+      fetch('/api/shopping-list/current').catch(() => {
+        // No debería fallar estando online, pero si falla no hay nada más
+        // que hacer acá — no afecta lo que se muestra.
+      });
       return;
     }
     fetch('/api/shopping-list/current')

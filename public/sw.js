@@ -26,7 +26,14 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => cached);
+        .catch(
+          () =>
+            cached ||
+            new Response(JSON.stringify({ error: 'Sin conexión y sin datos en cache todavía' }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+        );
 
       // Sin esto, el navegador puede terminar el service worker apenas
       // respondWith resuelve con la respuesta cacheada, sin garantizar que
