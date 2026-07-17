@@ -7,9 +7,11 @@ import type { ShoppingListItemRecord } from '@/lib/db/procedures/shopping-list';
 
 export function ShoppingListItemRow({
   item,
+  disabled = false,
   onEdit,
 }: {
   item: ShoppingListItemRecord;
+  disabled?: boolean;
   onEdit: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -27,6 +29,7 @@ export function ShoppingListItemRow({
       <button
         type="button"
         className="btn btn-link text-start text-decoration-none p-0 flex-grow-1 text-body"
+        disabled={disabled}
         onClick={onEdit}
       >
         <div className="fw-semibold">
@@ -43,7 +46,7 @@ export function ShoppingListItemRow({
       <button
         type="button"
         className="btn btn-outline-danger btn-sm"
-        disabled={isPending}
+        disabled={disabled || isPending}
         onClick={handleDelete}
         aria-label="Eliminar"
       >

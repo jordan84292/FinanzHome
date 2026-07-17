@@ -7,9 +7,11 @@ import { showError, showSuccess } from '@/lib/ui/alerts';
 
 export function ConfirmPurchaseButton({
   shoppingListId,
+  disabled = false,
   onConfirmed,
 }: {
   shoppingListId: number;
+  disabled?: boolean;
   onConfirmed: (shoppingListId: number) => void;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -34,7 +36,7 @@ export function ConfirmPurchaseButton({
   }
 
   return (
-    <button type="button" className="btn btn-primary" disabled={isPending} onClick={handleConfirm}>
+    <button type="button" className="btn btn-primary" disabled={disabled || isPending} onClick={handleConfirm}>
       {isPending ? 'Confirmando…' : 'Confirmar compra'}
     </button>
   );

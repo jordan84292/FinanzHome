@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ShoppingListItemRow } from '@/components/shopping-list/ShoppingListItemRow';
 import { ShoppingListItemForm } from '@/components/shopping-list/ShoppingListItemForm';
 import { ConfirmPurchaseButton } from './confirm-purchase-button';
 import { SplitPanel } from '@/components/shopping-list/SplitPanel';
+import { useOnlineStatus } from '@/lib/pwa/use-online-status';
 import type { ProductRecord } from '@/lib/db/procedures/products';
 import type { ShoppingListItemRecord, ShoppingListRecord } from '@/lib/db/procedures/shopping-list';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
@@ -26,24 +27,55 @@ export function ShoppingListClient({
     null,
   );
   const [confirmedListId, setConfirmedListId] = useState<number | null>(null);
+  const [liveList, setLiveList] = useState(list);
+  const [liveItems, setLiveItems] = useState(items);
+  const isOnline = useOnlineStatus();
+
+  useEffect(() => {
+    if (isOnline) {
+      return;
+    }
+    fetch('/api/shopping-list/current')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data) {
+          setLiveList(data.list);
+          setLiveItems(data.items);
+        }
+      })
+      .catch(() => {
+        // Sin red y sin nada en cache todavía — nos quedamos con lo último
+        // que ya se renderizó desde el servidor.
+      });
+  }, [isOnline]);
 
   return (
     <main className="container-fluid px-3 py-4 pb-5">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h1 className="h4 mb-0">Lista de compras</h1>
-        <button type="button" className="btn btn-primary btn-sm" onClick={() => setPanel({ mode: 'add' })}>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={!isOnline}
+          onClick={() => setPanel({ mode: 'add' })}
+        >
           <i className="bi bi-plus-lg me-1" />
           Producto
         </button>
       </div>
 
       <ul className="list-group mb-4">
-        {items.map((item) => (
-          <ShoppingListItemRow key={item.id} item={item} onEdit={() => setPanel({ mode: 'edit', item })} />
+        {liveItems.map((item) => (
+          <ShoppingListItemRow
+            key={item.id}
+            item={item}
+            disabled={!isOnline}
+            onEdit={() => setPanel({ mode: 'edit', item })}
+          />
         ))}
       </ul>
 
-      {items.length === 0 ? (
+      {liveItems.length === 0 ? (
         <p className="text-body-secondary">No falta nada por ahora — tu inventario está al día.</p>
       ) : null}
 
@@ -59,7 +91,7 @@ export function ShoppingListClient({
             </div>
             <ShoppingListItemForm
               mode={panel.mode}
-              shoppingListId={list.id}
+              shoppingListId={liveList.id}
               item={panel.mode === 'edit' ? panel.item : undefined}
               products={products}
               currencies={currencies}
@@ -68,7 +100,7 @@ export function ShoppingListClient({
         </div>
       ) : null}
 
-      {items.length > 0 ? (
+      {liveItems.length > 0 ? (
         <div
           className="position-fixed bottom-0 start-0 w-100 bg-body border-top p-3 d-flex justify-content-between align-items-center"
           style={{ zIndex: 1040 }}
@@ -77,10 +109,14 @@ export function ShoppingListClient({
             <div className="text-body-secondary small">Total estimado</div>
             <div className="h5 mb-0">
               {displayCurrencySymbol}
-              {list.total_estimated_live ?? 0}
+              {liveList.total_estimated_live ?? 0}
             </div>
           </div>
-          <ConfirmPurchaseButton shoppingListId={list.id} onConfirmed={setConfirmedListId} />
+          <ConfirmPurchaseButton
+            shoppingListId={liveList.id}
+            disabled={!isOnline}
+            onConfirmed={setConfirmedListId}
+          />
         </div>
       ) : null}
 
