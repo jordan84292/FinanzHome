@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 
 export function AuthShell({
   title,
@@ -18,12 +19,15 @@ export function AuthShell({
     >
       <div className="w-100" style={{ maxWidth: 400 }}>
         <div className="d-flex flex-column align-items-center text-center mb-4">
-          <div
-            className="d-flex align-items-center justify-content-center rounded-circle mb-3"
-            style={{ width: 64, height: 64, background: 'var(--gradient-accent)', boxShadow: 'var(--glow-accent)' }}
-          >
-            <i className="bi bi-house-heart-fill text-white" style={{ fontSize: '1.75rem' }} />
-          </div>
+          <Image
+            src="/logo-icon.png"
+            alt="FinanzHome"
+            width={72}
+            height={72}
+            className="rounded-4 mb-3"
+            style={{ boxShadow: 'var(--glow-accent)' }}
+            priority
+          />
           <span className="h4 mb-0 page-title">FinanzHome</span>
           <span className="text-body-secondary small">Tu hogar, tus finanzas</span>
         </div>
