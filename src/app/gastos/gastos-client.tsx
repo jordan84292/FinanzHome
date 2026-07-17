@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { RecurringExpenseRow } from '@/components/gastos/RecurringExpenseRow';
 import { RecurringExpenseForm } from '@/components/gastos/RecurringExpenseForm';
 import { ExpenseDetailPanel } from '@/components/gastos/ExpenseDetailPanel';
-import { showError } from '@/lib/ui/alerts';
-import { deactivateRecurringExpenseAction } from './actions';
+import { showError, showSuccess } from '@/lib/ui/alerts';
+import { deactivateRecurringExpenseAction, reactivateRecurringExpenseAction } from './actions';
 import type { ExpenseCategoryRecord, RecurringExpenseRecord } from '@/lib/db/procedures/recurring-expenses';
 import type { HouseholdMemberRecord } from '@/lib/db/procedures/household';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
@@ -28,6 +28,9 @@ export function GastosClient({
   currencies: CurrencyRecord[];
 }) {
   const [panel, setPanel] = useState<Panel>(null);
+  const [tab, setTab] = useState<'active' | 'deleted'>('active');
+
+  const visibleExpenses = expenses.filter((e) => (tab === 'active' ? e.is_active === 1 : e.is_active === 0));
 
   return (
     <main className="container-fluid px-3 py-4">
@@ -39,8 +42,25 @@ export function GastosClient({
         </button>
       </div>
 
+      <div className="btn-group mb-3" role="group">
+        <button
+          type="button"
+          className={`btn btn-sm ${tab === 'active' ? 'btn-primary' : 'btn-outline-secondary'}`}
+          onClick={() => setTab('active')}
+        >
+          Activos
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${tab === 'deleted' ? 'btn-primary' : 'btn-outline-secondary'}`}
+          onClick={() => setTab('deleted')}
+        >
+          Eliminados
+        </button>
+      </div>
+
       <ul className="list-group">
-        {expenses.map((expense) => (
+        {visibleExpenses.map((expense) => (
           <RecurringExpenseRow
             key={expense.id}
             expense={expense}
@@ -49,8 +69,10 @@ export function GastosClient({
         ))}
       </ul>
 
-      {expenses.length === 0 ? (
-        <p className="text-body-secondary">Todavía no registraste gastos recurrentes.</p>
+      {visibleExpenses.length === 0 ? (
+        <p className="text-body-secondary">
+          {tab === 'active' ? 'Todavía no registraste gastos recurrentes.' : 'No hay gastos eliminados.'}
+        </p>
       ) : null}
 
       {panel && panel.mode !== 'detail' ? (
@@ -80,10 +102,21 @@ export function GastosClient({
           expense={panel.expense}
           onClose={() => setPanel(null)}
           onEdit={() => setPanel({ mode: 'edit', expense: panel.expense })}
-          onDeactivated={() => {
+          onDeleted={() => {
             deactivateRecurringExpenseAction(panel.expense.id)
-              .then(() => setPanel(null))
-              .catch(() => showError('No se pudo desactivar el gasto. Intentá de nuevo.'));
+              .then(() => {
+                showSuccess('Gasto eliminado. Podés restaurarlo desde "Eliminados".');
+                setPanel(null);
+              })
+              .catch(() => showError('No se pudo eliminar el gasto. Intentá de nuevo.'));
+          }}
+          onRestored={() => {
+            reactivateRecurringExpenseAction(panel.expense.id)
+              .then(() => {
+                showSuccess('Gasto restaurado.');
+                setPanel(null);
+              })
+              .catch(() => showError('No se pudo restaurar el gasto. Intentá de nuevo.'));
           }}
         />
       ) : null}

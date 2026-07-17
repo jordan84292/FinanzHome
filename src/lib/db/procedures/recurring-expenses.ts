@@ -60,8 +60,14 @@ export async function createExpenseCategory(name: string): Promise<ExpenseCatego
   return rows[0];
 }
 
-export async function listRecurringExpenses(householdId: number): Promise<RecurringExpenseRecord[]> {
-  return callProcedure<RecurringExpenseRecord>('sp_recurring_expense_list', [householdId]);
+export async function listRecurringExpenses(
+  householdId: number,
+  includeInactive: boolean = false,
+): Promise<RecurringExpenseRecord[]> {
+  return callProcedure<RecurringExpenseRecord>('sp_recurring_expense_list', [
+    householdId,
+    includeInactive ? 1 : 0,
+  ]);
 }
 
 export async function createRecurringExpense(params: {
@@ -133,6 +139,13 @@ export async function deactivateRecurringExpense(
   householdId: number,
 ): Promise<void> {
   await callProcedure('sp_recurring_expense_deactivate', [recurringExpenseId, householdId]);
+}
+
+export async function reactivateRecurringExpense(
+  recurringExpenseId: number,
+  householdId: number,
+): Promise<void> {
+  await callProcedure('sp_recurring_expense_reactivate', [recurringExpenseId, householdId]);
 }
 
 export async function generateNextOccurrence(

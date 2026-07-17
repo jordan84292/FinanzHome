@@ -1,7 +1,8 @@
 DROP PROCEDURE IF EXISTS sp_recurring_expense_list;
 
 CREATE PROCEDURE sp_recurring_expense_list(
-  IN p_household_id INT UNSIGNED
+  IN p_household_id INT UNSIGNED,
+  IN p_include_inactive TINYINT(1)
 )
 BEGIN
   SELECT
@@ -29,6 +30,6 @@ BEGIN
     ORDER BY eo.due_date ASC
     LIMIT 1
   )
-  WHERE re.household_id = p_household_id AND re.is_active = 1
-  ORDER BY (next_occ.due_date IS NULL) ASC, next_occ.due_date ASC, re.name ASC;
+  WHERE re.household_id = p_household_id AND (re.is_active = 1 OR p_include_inactive = 1)
+  ORDER BY re.is_active DESC, (next_occ.due_date IS NULL) ASC, next_occ.due_date ASC, re.name ASC;
 END;

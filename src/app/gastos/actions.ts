@@ -6,6 +6,7 @@ import { requireMembership } from '@/lib/household/require-membership';
 import {
   createRecurringExpense,
   deactivateRecurringExpense,
+  reactivateRecurringExpense,
   listOccurrences,
   markOccurrencePaid,
   updateRecurringExpense,
@@ -177,6 +178,12 @@ export async function updateRecurringExpenseAction(
 export async function deactivateRecurringExpenseAction(recurringExpenseId: number): Promise<void> {
   const membership = await requireMembership();
   await deactivateRecurringExpense(recurringExpenseId, membership.id);
+  revalidatePath('/gastos');
+}
+
+export async function reactivateRecurringExpenseAction(recurringExpenseId: number): Promise<void> {
+  const membership = await requireMembership();
+  await reactivateRecurringExpense(recurringExpenseId, membership.id);
   revalidatePath('/gastos');
 }
 

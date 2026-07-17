@@ -24,9 +24,10 @@ export function RecurringExpenseRow({
   onClick: () => void;
 }) {
   const status = expense.status ?? 'sin_ocurrencia';
+  const isDeleted = expense.is_active === 0;
 
   return (
-    <li className="list-group-item">
+    <li className="list-group-item" style={isDeleted ? { opacity: 0.6 } : undefined}>
       <button
         type="button"
         className="btn btn-link text-start text-decoration-none p-0 w-100 text-body"
@@ -39,11 +40,15 @@ export function RecurringExpenseRow({
               {expense.currency_symbol}
               {expense.amount} · {expense.category_name} · {expense.responsible_display_name}
             </div>
-            {expense.next_due_date ? (
+            {!isDeleted && expense.next_due_date ? (
               <div className="text-body-secondary small">Próximo vencimiento: {expense.next_due_date}</div>
             ) : null}
           </div>
-          <span className={`badge ${STATUS_CLASSES[status]}`}>{STATUS_LABELS[status]}</span>
+          {isDeleted ? (
+            <span className="badge text-bg-secondary">Eliminado</span>
+          ) : (
+            <span className={`badge ${STATUS_CLASSES[status]}`}>{STATUS_LABELS[status]}</span>
+          )}
         </div>
       </button>
     </li>

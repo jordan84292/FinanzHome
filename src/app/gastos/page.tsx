@@ -17,7 +17,7 @@ export default async function GastosPage() {
   }
 
   const [expenses, categories, members, currencies] = await Promise.all([
-    listRecurringExpenses(membership.id),
+    listRecurringExpenses(membership.id, true),
     listExpenseCategories(),
     listHouseholdMembers(membership.id),
     listCurrencies(),

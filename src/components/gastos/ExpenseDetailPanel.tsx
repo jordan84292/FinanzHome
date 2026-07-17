@@ -82,12 +82,14 @@ export function ExpenseDetailPanel({
   expense,
   onClose,
   onEdit,
-  onDeactivated,
+  onDeleted,
+  onRestored,
 }: {
   expense: RecurringExpenseRecord;
   onClose: () => void;
   onEdit: () => void;
-  onDeactivated: () => void;
+  onDeleted: () => void;
+  onRestored: () => void;
 }) {
   const [occurrences, setOccurrences] = useState<ExpenseOccurrenceRecord[] | null>(null);
   const [hasError, setHasError] = useState(false);
@@ -136,16 +138,28 @@ export function ExpenseDetailPanel({
           {expense.amount} · {expense.category_name} · Responsable: {expense.responsible_display_name}
         </div>
 
+        {expense.is_active === 0 ? (
+          <div className="alert alert-secondary py-2 small mb-3">Este gasto está eliminado.</div>
+        ) : null}
+
         <div className="d-flex gap-2 mb-3">
-          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={onEdit}>
-            Editar
-          </button>
-          <button type="button" className="btn btn-outline-danger btn-sm" onClick={onDeactivated}>
-            Desactivar
-          </button>
+          {expense.is_active === 1 ? (
+            <>
+              <button type="button" className="btn btn-outline-secondary btn-sm" onClick={onEdit}>
+                Editar
+              </button>
+              <button type="button" className="btn btn-outline-danger btn-sm" onClick={onDeleted}>
+                Eliminar
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn btn-outline-primary btn-sm" onClick={onRestored}>
+              Restaurar
+            </button>
+          )}
         </div>
 
-        {nextUnpaid ? (
+        {expense.is_active === 1 && nextUnpaid ? (
           <button
             type="button"
             className="btn btn-primary w-100 mb-3"
