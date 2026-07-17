@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { after } from 'next/server';
 import { getUserByEmail } from '@/lib/db/procedures/auth';
 import { createPasswordResetToken } from '@/lib/db/procedures/password-reset';
 import { sendPasswordResetEmail } from '@/lib/email/send-password-reset';
@@ -28,14 +29,23 @@ async function performPasswordResetRequest(params: { email: string; appUrl: stri
 
   await createPasswordResetToken({ userId: user.id, token, expiresAt });
 
-  try {
-    await sendPasswordResetEmail({
-      to: user.email,
-      resetUrl: `${params.appUrl}/restablecer-password?token=${token}`,
-    });
-  } catch (error) {
-    console.error('Error al enviar el correo de restablecimiento:', error);
-  }
+  // No se espera (`await`) el envío del correo aquí: hacerlo bloquearía la
+  // respuesta hasta que Resend termine, haciendo que la ruta "cuenta
+  // existente" tarde según la latencia de Resend y reabriendo el canal
+  // lateral de temporización que el `Promise.all([..., delay(500)])` de
+  // requestPasswordReset existe para cerrar. Se programa con `after()` para
+  // que corra tras enviar la respuesta, sin arriesgar que quede colgando en
+  // un entorno serverless.
+  after(async () => {
+    try {
+      await sendPasswordResetEmail({
+        to: user.email,
+        resetUrl: `${params.appUrl}/restablecer-password?token=${token}`,
+      });
+    } catch (error) {
+      console.error('Error al enviar el correo de restablecimiento:', error);
+    }
+  });
 }
 
 export async function requestPasswordReset(params: { email: string; appUrl: string }): Promise<void> {
