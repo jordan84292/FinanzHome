@@ -3,6 +3,8 @@
 import { useActionState } from 'react';
 import Link from 'next/link';
 import { loginAction, type LoginActionState } from './actions';
+import { AuthShell } from '@/components/auth/AuthShell';
+import { PasswordInput } from '@/components/auth/PasswordInput';
 
 const initialState: LoginActionState = { error: null };
 
@@ -10,17 +12,31 @@ export default function LoginPage() {
   const [state, formAction, pending] = useActionState(loginAction, initialState);
 
   return (
-    <main className="container-fluid px-3 py-4" style={{ maxWidth: 420 }}>
-      <h1 className="h4 mb-4">Iniciar sesión</h1>
+    <AuthShell
+      title="Iniciar sesión"
+      subtitle="Accedé a tu cuenta"
+      footer={
+        <>
+          <p className="small mb-1">
+            ¿No tenés cuenta? <Link href="/register">Creá una</Link>
+          </p>
+          <p className="small mb-0">
+            <Link href="/olvide-password">¿Olvidaste tu contraseña?</Link>
+          </p>
+        </>
+      }
+    >
       <form action={formAction} className="d-flex flex-column gap-3">
         <div>
           <label htmlFor="email" className="form-label">Correo</label>
-          <input id="email" name="email" type="email" className="form-control" required />
+          <div className="input-group">
+            <span className="input-group-text">
+              <i className="bi bi-envelope-fill" />
+            </span>
+            <input id="email" name="email" type="email" className="form-control" required />
+          </div>
         </div>
-        <div>
-          <label htmlFor="password" className="form-label">Contraseña</label>
-          <input id="password" name="password" type="password" className="form-control" required />
-        </div>
+        <PasswordInput label="Contraseña" name="password" />
         {state.error ? (
           <div className="alert alert-danger py-2 mb-0" role="alert">
             {state.error}
@@ -30,12 +46,6 @@ export default function LoginPage() {
           {pending ? 'Ingresando…' : 'Ingresar'}
         </button>
       </form>
-      <p className="mt-3 small">
-        ¿No tenés cuenta? <Link href="/register">Creá una</Link>
-      </p>
-      <p className="mt-2 small">
-        <Link href="/olvide-password">¿Olvidaste tu contraseña?</Link>
-      </p>
-    </main>
+    </AuthShell>
   );
 }

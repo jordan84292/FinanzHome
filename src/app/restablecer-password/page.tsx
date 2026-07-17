@@ -1,5 +1,6 @@
 import { checkPasswordResetToken } from '@/lib/db/procedures/password-reset';
 import { ResetPasswordForm } from './reset-password-form';
+import { AuthShell } from '@/components/auth/AuthShell';
 
 export default async function ResetPasswordPage({
   searchParams,
@@ -10,9 +11,9 @@ export default async function ResetPasswordPage({
 
   if (!token) {
     return (
-      <main className="container-fluid px-3 py-4" style={{ maxWidth: 420 }}>
-        <div className="alert alert-danger" role="alert">Enlace inválido.</div>
-      </main>
+      <AuthShell title="Enlace inválido" subtitle="Falta el token de restablecimiento">
+        <div className="alert alert-danger mb-0" role="alert">Enlace inválido.</div>
+      </AuthShell>
     );
   }
 
@@ -25,18 +26,17 @@ export default async function ResetPasswordPage({
 
   if (!isValid) {
     return (
-      <main className="container-fluid px-3 py-4" style={{ maxWidth: 420 }}>
-        <div className="alert alert-danger" role="alert">
+      <AuthShell title="Enlace vencido" subtitle="Este enlace ya no es válido">
+        <div className="alert alert-danger mb-0" role="alert">
           Este enlace no es válido o ya expiró. Pedí uno nuevo.
         </div>
-      </main>
+      </AuthShell>
     );
   }
 
   return (
-    <main className="container-fluid px-3 py-4" style={{ maxWidth: 420 }}>
-      <h1 className="h4 mb-4">Elegí tu nueva contraseña</h1>
+    <AuthShell title="Elegí tu nueva contraseña" subtitle="Ingresá una contraseña nueva para tu cuenta">
       <ResetPasswordForm token={token} />
-    </main>
+    </AuthShell>
   );
 }

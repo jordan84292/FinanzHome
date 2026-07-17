@@ -1,7 +1,10 @@
 'use client';
 
 import { useActionState } from 'react';
+import Link from 'next/link';
 import { registerAction, type RegisterActionState } from './actions';
+import { AuthShell } from '@/components/auth/AuthShell';
+import { PasswordInput } from '@/components/auth/PasswordInput';
 
 const initialState: RegisterActionState = { error: null };
 
@@ -9,28 +12,35 @@ export default function RegisterPage() {
   const [state, formAction, pending] = useActionState(registerAction, initialState);
 
   return (
-    <main className="container-fluid px-3 py-4" style={{ maxWidth: 420 }}>
-      <h1 className="h4 mb-4">Crear cuenta</h1>
+    <AuthShell
+      title="Crear cuenta"
+      subtitle="Empezá a organizar las finanzas de tu hogar"
+      footer={
+        <p className="small mb-0">
+          ¿Ya tenés cuenta? <Link href="/login">Iniciá sesión</Link>
+        </p>
+      }
+    >
       <form action={formAction} className="d-flex flex-column gap-3">
         <div>
           <label htmlFor="name" className="form-label">Nombre</label>
-          <input id="name" name="name" type="text" className="form-control" required />
+          <div className="input-group">
+            <span className="input-group-text">
+              <i className="bi bi-person-fill" />
+            </span>
+            <input id="name" name="name" type="text" className="form-control" required />
+          </div>
         </div>
         <div>
           <label htmlFor="email" className="form-label">Correo</label>
-          <input id="email" name="email" type="email" className="form-control" required />
+          <div className="input-group">
+            <span className="input-group-text">
+              <i className="bi bi-envelope-fill" />
+            </span>
+            <input id="email" name="email" type="email" className="form-control" required />
+          </div>
         </div>
-        <div>
-          <label htmlFor="password" className="form-label">Contraseña</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            className="form-control"
-            required
-            minLength={8}
-          />
-        </div>
+        <PasswordInput label="Contraseña" name="password" minLength={8} />
         {state.error ? (
           <div className="alert alert-danger py-2 mb-0" role="alert">
             {state.error}
@@ -40,6 +50,6 @@ export default function RegisterPage() {
           {pending ? 'Creando cuenta…' : 'Crear cuenta'}
         </button>
       </form>
-    </main>
+    </AuthShell>
   );
 }

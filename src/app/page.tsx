@@ -27,6 +27,11 @@ export default async function Home() {
   ]);
 
   return (
-    <DashboardClient byCategory={byCategory} monthlyTrend={monthlyTrend} memberBalances={memberBalances} />
+    <DashboardClient
+      displayName={membership.display_name}
+      byCategory={byCategory}
+      monthlyTrend={monthlyTrend}
+      memberBalances={memberBalances}
+    />
   );
 }

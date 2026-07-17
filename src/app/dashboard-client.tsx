@@ -44,15 +44,18 @@ const baseChartOptions: Highcharts.Options = {
 };
 
 export function DashboardClient({
+  displayName,
   byCategory,
   monthlyTrend,
   memberBalances,
 }: {
+  displayName: string;
   byCategory: ExpenseByCategoryRecord[];
   monthlyTrend: MonthlyTrendRecord[];
   memberBalances: MemberBalanceRecord[];
 }) {
   const totalThisMonth = byCategory.reduce((acc, row) => acc + Number(row.total_amount), 0);
+  const firstName = displayName.split(' ')[0];
 
   const categoryOptions: Highcharts.Options = {
     ...baseChartOptions,
@@ -121,8 +124,8 @@ export function DashboardClient({
 
   return (
     <main className="container-fluid px-3 py-4" style={{ paddingBottom: '5rem' }}>
-      <h1 className="h4 mb-1">Dashboard</h1>
-      <p className="text-body-secondary small mb-4">Resumen financiero del hogar</p>
+      <h1 className="h4 mb-1">¡Hola, {firstName}! 👋</h1>
+      <p className="text-body-secondary small mb-4">Este es el resumen financiero de tu hogar</p>
 
       <div className="mb-4">
         <div className="text-body-secondary small">Gasto pagado este mes</div>
