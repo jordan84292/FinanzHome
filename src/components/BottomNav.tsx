@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Inicio', icon: 'bi-house' },
+  { href: '/dashboard', label: 'Dashboard', icon: 'bi-bar-chart-line' },
   { href: '/inventario', label: 'Inventario', icon: 'bi-basket' },
   { href: '/compras', label: 'Compras', icon: 'bi-cart' },
   { href: '/gastos', label: 'Gastos', icon: 'bi-wallet2' },
