@@ -268,13 +268,13 @@ Para los demás casos "N filas variables" (splits de compra, % de gasto comparti
 
 ---
 
-## Fase 7 — Recordatorios por WhatsApp (decidido — reemplaza el email para este módulo específicamente)
+## Fase 7 — Recordatorios por Telegram (decidido — reemplaza el email para este módulo específicamente)
 
-**Cambio de dirección (registrado en Fase 1b):** los recordatorios recurrentes de esta fase salen por **WhatsApp Business API**, no por email. Esto NO afecta el email de invitación a miembros del hogar (Fase 0, ya construido con Resend) — ese se queda como está; Resend sigue siendo parte del stack para eso. Solo el canal de *recordatorios* cambia.
+**Cambio de dirección (registrado en Fase 1b, revisado 2026-07-17):** los recordatorios recurrentes de esta fase salen por **Telegram Bot API**, no por email. Esta fase originalmente apuntaba a WhatsApp Business API, pero se cambió a Telegram tras evaluar el setup real: WhatsApp Business API exige verificación de negocio (empresa legal) y plantillas de mensaje pre-aprobadas por Meta antes de poder mandar un solo recordatorio; Telegram no exige ninguna de las dos cosas — un bot se crea en minutos vía `@BotFather`, sin cuenta de negocio, sin revisión, sin plantillas, y sin costo por mensaje. Esto NO afecta el email de invitación a miembros del hogar (Fase 0, ya construido con Resend) — ese se queda como está; Resend sigue siendo parte del stack para eso. Solo el canal de *recordatorios* cambia.
 
-**Prerrequisito externo, no automatizable:** antes de implementar esta fase hace falta una cuenta de WhatsApp Business API real (Meta Cloud API directo, o un BSP como Twilio/360dialog), con número de negocio verificado y plantillas de mensaje pre-aprobadas por Meta para conversaciones iniciadas por la empresa (un recordatorio es justamente ese caso — no es una respuesta dentro de una ventana de 24h iniciada por el usuario). Este setup se hace en el panel del proveedor elegido, fuera del control del asistente. **No arrancar la implementación de esta fase hasta tener la cuenta y al menos una plantilla aprobada.**
+**Prerrequisito externo, no automatizable (mucho más liviano que el de WhatsApp):** crear un bot con `@BotFather` en Telegram (`/newbot` → nombre + username terminado en `bot`) y guardar el token que devuelve (formato `123456789:ABC...`) como variable de entorno. No hace falta empresa, verificación, ni plantillas — el bot puede mandar texto libre desde el primer minuto. Único requisito por usuario: cada miembro del hogar debe abrirle un chat al bot y enviar `/start` una vez (o hacer clic en un enlace de vinculación desde `/perfil`, ver abajo) antes de poder recibir mensajes — Telegram no permite que un bot le escriba primero a alguien que nunca inició conversación con él.
 
-**Nuevo requisito de datos (a diseñar en detalle cuando se planifique esta fase):** para enviar por WhatsApp hace falta un número de teléfono por usuario — probablemente una columna `phone_number` en `users` (o su propia tabla si se necesita verificación), poblable desde `/perfil` (la misma pantalla que ya tiene el horario de pago, Fase 1b).
+**Nuevo requisito de datos (a diseñar en detalle cuando se planifique esta fase):** en vez de un `phone_number`, hace falta guardar el **`telegram_chat_id`** de cada usuario — probablemente una columna `telegram_chat_id` en `users` (nullable, poblada recién cuando el usuario vincula su cuenta). El flujo de vinculación recomendado: `/perfil` muestra un botón/enlace `https://t.me/<bot_username>?start=<token_único_del_usuario>`; al hacer clic y presionar "Iniciar" en Telegram, el bot recibe ese `start` payload vía webhook (`POST /api/telegram/webhook`), lo resuelve contra el usuario dueño de ese token, y guarda el `chat_id` recibido. Esto evita pedirle al usuario que copie/pegue un ID manualmente.
 
 **Objetivo:** avisar 1 día antes del vencimiento, insistir a diario desde el día de pago del responsable hasta que se marque pagado, y avisar el día de retiro de fondos.
 
@@ -287,13 +287,14 @@ Para los demás casos "N filas variables" (splits de compra, % de gasto comparti
   3. **withdrawal**: `recurring_expenses.withdrawal_day = DAY(today)` para gastos weekly/biweekly activos, sin `reminder_log` de tipo `withdrawal` para hoy
 - `sp_reminder_log_sent(occurrence_id, member_id, reminder_type, sent_date)` — idempotencia (un envío por tipo/ocurrencia/día)
 
-**Wrappers TS:** `reminders.ts` → `getPendingReminders`, `logReminderSent`; `lib/whatsapp/client.ts` → `sendReminderWhatsAppMessage(type, occurrence, member)` (usa una plantilla aprobada por tipo de recordatorio — el proveedor elegido define la forma exacta del payload)
+**Wrappers TS:** `reminders.ts` → `getPendingReminders`, `logReminderSent`; `lib/telegram/client.ts` → `sendReminderTelegramMessage(type, occurrence, member)` (mensaje de texto libre por tipo de recordatorio — sin plantilla pre-aprobada, a diferencia del diseño original con WhatsApp) y `linkTelegramAccount(userId, chatId)` (llamado desde el webhook al resolver un `/start <token>`)
 
 **Infraestructura (fuera del alcance de "solo SPs", es orquestación):**
-- Route Handler `POST /api/cron/reminders`, protegido con un secret en header, que: llama `getPendingReminders` → envía por WhatsApp Business API → llama `logReminderSent` por cada envío exitoso
+- Route Handler `POST /api/cron/reminders`, protegido con un secret en header, que: llama `getPendingReminders` → envía por Telegram Bot API → llama `logReminderSent` por cada envío exitoso
+- Route Handler `POST /api/telegram/webhook` para recibir el `/start <token>` de vinculación de cada usuario y guardar su `chat_id`
 - **Disparador diario: Vercel Cron Jobs** (decidido — el hosting es Vercel), configurado en `vercel.json` para pegarle una vez al día a `/api/cron/reminders`.
 
-**UI:** no hay pantalla nueva obligatoria para el MVP más allá del campo de teléfono en `/perfil` — "Marcar como pagado" (ya construido en Fase 5) es lo que corta el loop diario.
+**UI:** no hay pantalla nueva obligatoria para el MVP más allá de un botón "Vincular Telegram" en `/perfil` — "Marcar como pagado" (ya construido en Fase 5) es lo que corta el loop diario.
 
 **Notas MariaDB:** sin restricciones; toda la lógica de fechas es DATE/INT estándar.
 
