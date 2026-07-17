@@ -15,6 +15,7 @@ CREATE PROCEDURE sp_recurring_expense_create(
 )
 BEGIN
   DECLARE v_member_exists INT;
+  DECLARE v_creator_exists INT;
 
   SELECT COUNT(*) INTO v_member_exists
   FROM household_members
@@ -22,6 +23,14 @@ BEGIN
 
   IF v_member_exists = 0 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Responsible member not found in this household';
+  END IF;
+
+  SELECT COUNT(*) INTO v_creator_exists
+  FROM household_members
+  WHERE id = p_created_by_member_id AND household_id = p_household_id;
+
+  IF v_creator_exists = 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Creator member not found in this household';
   END IF;
 
   INSERT INTO recurring_expenses (

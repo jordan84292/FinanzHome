@@ -112,6 +112,30 @@ describe('sp_recurring_expense_create', () => {
       }),
     ).rejects.toThrow(/not found in this household/i);
   });
+
+  it('rejects a created-by member that does not belong to the household', async () => {
+    const suffixA = uniqueSuffix();
+    const suffixB = uniqueSuffix();
+    const { householdId: householdIdA, memberId: memberIdA } = await createOwner(suffixA);
+    const { memberId: memberIdB } = await createOwner(suffixB);
+    const [category] = await listExpenseCategories();
+
+    await expect(
+      createRecurringExpense({
+        householdId: householdIdA,
+        name: `MaloCreador ${suffixA}`,
+        categoryId: category.id,
+        amount: 1000,
+        currencyId: CRC_ID,
+        periodicity: 'biweekly',
+        dueDayConfig: null,
+        withdrawalDay: 1,
+        firstDueDate: null,
+        responsibleMemberId: memberIdA,
+        createdByMemberId: memberIdB,
+      }),
+    ).rejects.toThrow(/not found in this household/i);
+  });
 });
 
 describe('sp_recurring_expense_update / sp_recurring_expense_deactivate / sp_recurring_expense_list', () => {
