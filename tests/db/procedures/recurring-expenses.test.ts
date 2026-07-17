@@ -7,7 +7,9 @@ import {
   deactivateRecurringExpense,
   generateNextOccurrence,
   listExpenseCategories,
+  listOccurrences,
   listRecurringExpenses,
+  markOccurrencePaid,
   updateRecurringExpense,
 } from '@/lib/db/procedures/recurring-expenses';
 import { uniqueSuffix } from '../../helpers/db';
@@ -418,5 +420,179 @@ describe('sp_recurring_expense_list status after an occurrence exists', () => {
     const found = list.find((e) => e.id === expense.id);
 
     expect(found?.status).toBe('vencido');
+  });
+});
+
+describe('sp_expense_occurrence_list', () => {
+  it('returns the full occurrence history for one recurring expense, newest due date first', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const [category] = await listExpenseCategories();
+    const expense = await createRecurringExpense({
+      householdId,
+      name: `Historial ${suffix}`,
+      categoryId: category.id,
+      amount: 2000,
+      currencyId: CRC_ID,
+      periodicity: 'biweekly',
+      dueDayConfig: null,
+      withdrawalDay: 12,
+      firstDueDate: null,
+      responsibleMemberId: memberId,
+      createdByMemberId: memberId,
+    });
+
+    const history = await listOccurrences(expense.id, householdId);
+
+    expect(history).toHaveLength(1);
+    expect(history[0].recurring_expense_id).toBe(expense.id);
+    expect(history[0].is_paid).toBe(0);
+  });
+
+  it('rejects a recurring expense from a different household', async () => {
+    const suffixA = uniqueSuffix();
+    const suffixB = uniqueSuffix();
+    const { householdId: householdIdA, memberId: memberIdA } = await createOwner(suffixA);
+    const { householdId: householdIdB } = await createOwner(suffixB);
+    const [category] = await listExpenseCategories();
+    const expense = await createRecurringExpense({
+      householdId: householdIdA,
+      name: `Historial cross ${suffixA}`,
+      categoryId: category.id,
+      amount: 2000,
+      currencyId: CRC_ID,
+      periodicity: 'biweekly',
+      dueDayConfig: null,
+      withdrawalDay: 12,
+      firstDueDate: null,
+      responsibleMemberId: memberIdA,
+      createdByMemberId: memberIdA,
+    });
+
+    await expect(listOccurrences(expense.id, householdIdB)).rejects.toThrow(/not found in this household/i);
+  });
+});
+
+describe('sp_expense_occurrence_mark_paid / markOccurrencePaid', () => {
+  it('marks the open occurrence paid and generates the next biweekly cycle', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const [category] = await listExpenseCategories();
+    const expense = await createRecurringExpense({
+      householdId,
+      name: `Pago quincenal ${suffix}`,
+      categoryId: category.id,
+      amount: 4000,
+      currencyId: CRC_ID,
+      periodicity: 'biweekly',
+      dueDayConfig: null,
+      withdrawalDay: 20,
+      firstDueDate: null,
+      responsibleMemberId: memberId,
+      createdByMemberId: memberId,
+    });
+    const [firstOccurrence] = await listOccurrences(expense.id, householdId);
+
+    const history = await markOccurrencePaid({
+      occurrenceId: firstOccurrence.id,
+      householdId,
+      paidByMemberId: memberId,
+    });
+
+    expect(history).toHaveLength(2);
+    const paid = history.find((o) => o.id === firstOccurrence.id);
+    const next = history.find((o) => o.id !== firstOccurrence.id);
+    expect(paid?.is_paid).toBe(1);
+    expect(paid?.paid_by_member_id).toBe(memberId);
+    expect(next?.is_paid).toBe(0);
+    expect(new Date(next!.due_date).getTime()).toBeGreaterThan(new Date(paid!.due_date).getTime());
+  });
+
+  it('does not generate a second occurrence for one_time expenses once paid', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const [category] = await listExpenseCategories();
+    const expense = await createRecurringExpense({
+      householdId,
+      name: `Pago unico ${suffix}`,
+      categoryId: category.id,
+      amount: 9000,
+      currencyId: CRC_ID,
+      periodicity: 'one_time',
+      dueDayConfig: null,
+      withdrawalDay: null,
+      firstDueDate: '2026-11-15',
+      responsibleMemberId: memberId,
+      createdByMemberId: memberId,
+    });
+    const [firstOccurrence] = await listOccurrences(expense.id, householdId);
+
+    const history = await markOccurrencePaid({
+      occurrenceId: firstOccurrence.id,
+      householdId,
+      paidByMemberId: memberId,
+    });
+
+    expect(history).toHaveLength(1);
+    expect(history[0].is_paid).toBe(1);
+  });
+
+  it('is idempotent: marking an already-paid occurrence again does not change paid_at', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const [category] = await listExpenseCategories();
+    const expense = await createRecurringExpense({
+      householdId,
+      name: `Idempotente ${suffix}`,
+      categoryId: category.id,
+      amount: 3000,
+      currencyId: CRC_ID,
+      periodicity: 'one_time',
+      dueDayConfig: null,
+      withdrawalDay: null,
+      firstDueDate: '2026-10-01',
+      responsibleMemberId: memberId,
+      createdByMemberId: memberId,
+    });
+    const [firstOccurrence] = await listOccurrences(expense.id, householdId);
+
+    const firstMark = await markOccurrencePaid({
+      occurrenceId: firstOccurrence.id,
+      householdId,
+      paidByMemberId: memberId,
+    });
+    const secondMark = await markOccurrencePaid({
+      occurrenceId: firstOccurrence.id,
+      householdId,
+      paidByMemberId: memberId,
+    });
+
+    expect(secondMark[0].paid_at).toBe(firstMark[0].paid_at);
+  });
+
+  it('rejects an occurrence from a different household', async () => {
+    const suffixA = uniqueSuffix();
+    const suffixB = uniqueSuffix();
+    const { householdId: householdIdA, memberId: memberIdA } = await createOwner(suffixA);
+    const { householdId: householdIdB, memberId: memberIdB } = await createOwner(suffixB);
+    const [category] = await listExpenseCategories();
+    const expense = await createRecurringExpense({
+      householdId: householdIdA,
+      name: `Cross mark ${suffixA}`,
+      categoryId: category.id,
+      amount: 3000,
+      currencyId: CRC_ID,
+      periodicity: 'one_time',
+      dueDayConfig: null,
+      withdrawalDay: null,
+      firstDueDate: '2026-10-01',
+      responsibleMemberId: memberIdA,
+      createdByMemberId: memberIdA,
+    });
+    const [firstOccurrence] = await listOccurrences(expense.id, householdIdA);
+
+    await expect(
+      markOccurrencePaid({ occurrenceId: firstOccurrence.id, householdId: householdIdB, paidByMemberId: memberIdB }),
+    ).rejects.toThrow(/not found in this household/i);
   });
 });

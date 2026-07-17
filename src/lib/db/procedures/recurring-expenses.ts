@@ -132,3 +132,36 @@ export async function generateNextOccurrence(
   ]);
   return rows[0];
 }
+
+export async function listOccurrences(
+  recurringExpenseId: number,
+  householdId: number,
+): Promise<ExpenseOccurrenceRecord[]> {
+  return callProcedure<ExpenseOccurrenceRecord>('sp_expense_occurrence_list', [
+    recurringExpenseId,
+    householdId,
+  ]);
+}
+
+export async function markOccurrencePaid(params: {
+  occurrenceId: number;
+  householdId: number;
+  paidByMemberId: number;
+}): Promise<ExpenseOccurrenceRecord[]> {
+  return withTransaction(async (call) => {
+    const rows = await call<ExpenseOccurrenceRecord>('sp_expense_occurrence_mark_paid', [
+      params.occurrenceId,
+      params.householdId,
+      params.paidByMemberId,
+    ]);
+    const paidOccurrence = rows[0];
+    await call('sp_expense_occurrence_generate_next', [
+      paidOccurrence.recurring_expense_id,
+      params.householdId,
+    ]);
+    return call<ExpenseOccurrenceRecord>('sp_expense_occurrence_list', [
+      paidOccurrence.recurring_expense_id,
+      params.householdId,
+    ]);
+  });
+}
