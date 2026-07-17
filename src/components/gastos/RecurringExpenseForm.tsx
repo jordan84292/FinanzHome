@@ -1,14 +1,18 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useState, useEffect, useTransition } from 'react';
 import {
   createRecurringExpenseAction,
   updateRecurringExpenseAction,
+  getRecurringExpenseSharesAction,
+  setRecurringExpenseSharesAction,
   type CreateRecurringExpenseState,
   type UpdateRecurringExpenseState,
 } from '@/app/gastos/actions';
+import { showError, showSuccess } from '@/lib/ui/alerts';
 import { CurrencyAmountInput } from '@/components/CurrencyAmountInput';
 import type { ExpenseCategoryRecord, RecurringExpenseRecord } from '@/lib/db/procedures/recurring-expenses';
+import type { ExpenseShareRecord } from '@/lib/db/procedures/expense-shares';
 import type { HouseholdMemberRecord } from '@/lib/db/procedures/household';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
 
@@ -23,6 +27,103 @@ const WEEKDAYS = [
 ];
 
 const initialState: CreateRecurringExpenseState | UpdateRecurringExpenseState = { error: null };
+
+function ExpenseSharesSection({
+  recurringExpenseId,
+  members,
+}: {
+  recurringExpenseId: number;
+  members: HouseholdMemberRecord[];
+}) {
+  const [shares, setShares] = useState<ExpenseShareRecord[] | null>(null);
+  const [selected, setSelected] = useState<Record<number, boolean>>({});
+  const [percentages, setPercentages] = useState<Record<number, number>>({});
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    getRecurringExpenseSharesAction(recurringExpenseId).then((result) => {
+      if (result.error) {
+        showError(result.error);
+        return;
+      }
+      setShares(result.shares);
+      setSelected(Object.fromEntries(result.shares.map((s) => [s.member_id, true])));
+      setPercentages(Object.fromEntries(result.shares.map((s) => [s.member_id, s.percentage])));
+    });
+  }, [recurringExpenseId]);
+
+  const selectedMemberIds = members.filter((m) => selected[m.id]).map((m) => m.id);
+  const sum = selectedMemberIds.reduce((acc, id) => acc + (percentages[id] ?? 0), 0);
+  const sumIsValid = selectedMemberIds.length === 0 || Math.abs(sum - 100) < 0.001;
+
+  function handleSave(): void {
+    const sharesToSave = selectedMemberIds.map((memberId) => ({
+      memberId,
+      percentage: percentages[memberId] ?? 0,
+    }));
+    startTransition(() => {
+      setRecurringExpenseSharesAction(recurringExpenseId, sharesToSave).then((result) => {
+        if (result.error) {
+          showError(result.error);
+          return;
+        }
+        showSuccess('Reparto guardado.');
+      });
+    });
+  }
+
+  if (shares === null) {
+    return <p className="text-body-secondary">Cargando reparto…</p>;
+  }
+
+  return (
+    <div className="border rounded p-3">
+      <h3 className="h6 mb-3">Compartir con</h3>
+      <div className="d-flex flex-column gap-2">
+        {members.map((member) => (
+          <div key={member.id} className="d-flex align-items-center gap-2">
+            <input
+              type="checkbox"
+              className="form-check-input"
+              checked={selected[member.id] ?? false}
+              onChange={(e) => setSelected((prev) => ({ ...prev, [member.id]: e.target.checked }))}
+            />
+            <span className="flex-grow-1">{member.display_name}</span>
+            {selected[member.id] ? (
+              <div className="input-group" style={{ maxWidth: 120 }}>
+                <input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  max={100}
+                  className="form-control"
+                  value={percentages[member.id] ?? 0}
+                  onChange={(e) =>
+                    setPercentages((prev) => ({ ...prev, [member.id]: Number(e.target.value) }))
+                  }
+                />
+                <span className="input-group-text">%</span>
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      {selectedMemberIds.length > 0 ? (
+        <div className={`mt-2 ${sumIsValid ? 'text-success' : 'text-danger'}`}>Total: {sum.toFixed(2)}%</div>
+      ) : (
+        <div className="mt-2 text-body-secondary">Sin compartir</div>
+      )}
+      <button
+        type="button"
+        className="btn btn-outline-primary btn-sm mt-2"
+        disabled={!sumIsValid || isPending}
+        onClick={handleSave}
+      >
+        {isPending ? 'Guardando…' : 'Guardar reparto'}
+      </button>
+    </div>
+  );
+}
 
 export function RecurringExpenseForm({
   mode,
@@ -88,6 +189,9 @@ export function RecurringExpenseForm({
           ))}
         </select>
       </div>
+      {mode === 'edit' && expense ? (
+        <ExpenseSharesSection recurringExpenseId={expense.id} members={members} />
+      ) : null}
       {mode === 'create' ? (
         <>
           <div>

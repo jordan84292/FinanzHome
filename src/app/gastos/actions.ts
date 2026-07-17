@@ -11,6 +11,11 @@ import {
   updateRecurringExpense,
   type ExpenseOccurrenceRecord,
 } from '@/lib/db/procedures/recurring-expenses';
+import {
+  listRecurringExpenseShares,
+  setRecurringExpenseShares,
+  type ExpenseShareRecord,
+} from '@/lib/db/procedures/expense-shares';
 
 const periodicitySchema = z.enum(['weekly', 'biweekly', 'one_time']);
 
@@ -172,5 +177,39 @@ export async function markOccurrencePaidAction(occurrenceId: number): Promise<Ma
     return { occurrences, error: null };
   } catch {
     return { occurrences: [], error: 'No se pudo marcar el gasto como pagado.' };
+  }
+}
+
+export interface GetExpenseSharesState {
+  shares: ExpenseShareRecord[];
+  error: string | null;
+}
+
+export async function getRecurringExpenseSharesAction(recurringExpenseId: number): Promise<GetExpenseSharesState> {
+  const membership = await requireMembership();
+  try {
+    const shares = await listRecurringExpenseShares(recurringExpenseId, membership.id);
+    return { shares, error: null };
+  } catch {
+    return { shares: [], error: 'No se pudo cargar el reparto de este gasto.' };
+  }
+}
+
+export interface SetExpenseSharesState {
+  shares: ExpenseShareRecord[];
+  error: string | null;
+}
+
+export async function setRecurringExpenseSharesAction(
+  recurringExpenseId: number,
+  shares: Array<{ memberId: number; percentage: number }>,
+): Promise<SetExpenseSharesState> {
+  const membership = await requireMembership();
+  try {
+    const result = await setRecurringExpenseShares({ recurringExpenseId, householdId: membership.id, shares });
+    revalidatePath('/gastos');
+    return { shares: result, error: null };
+  } catch {
+    return { shares: [], error: 'Los porcentajes deben sumar 100%.' };
   }
 }
