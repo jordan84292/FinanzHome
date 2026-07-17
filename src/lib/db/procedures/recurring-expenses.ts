@@ -1,5 +1,6 @@
 import type { RowDataPacket } from 'mysql2';
 import { callProcedure } from '../call';
+import { withTransaction } from '../transaction';
 
 export interface ExpenseCategoryRecord extends RowDataPacket {
   id: number;
@@ -35,6 +36,18 @@ export interface RecurringExpenseRecord extends RowDataPacket {
   status?: 'vencido' | 'vence_pronto' | 'al_dia' | 'sin_ocurrencia';
 }
 
+export interface ExpenseOccurrenceRecord extends RowDataPacket {
+  id: number;
+  recurring_expense_id: number;
+  period_start: string;
+  period_end: string;
+  due_date: string;
+  is_paid: number;
+  paid_by_member_id: number | null;
+  paid_at: string | null;
+  created_at: string;
+}
+
 export async function listExpenseCategories(): Promise<ExpenseCategoryRecord[]> {
   return callProcedure<ExpenseCategoryRecord>('sp_expense_category_list');
 }
@@ -61,20 +74,24 @@ export async function createRecurringExpense(params: {
   responsibleMemberId: number;
   createdByMemberId: number;
 }): Promise<RecurringExpenseRecord> {
-  const rows = await callProcedure<RecurringExpenseRecord>('sp_recurring_expense_create', [
-    params.householdId,
-    params.name,
-    params.categoryId,
-    params.amount,
-    params.currencyId,
-    params.periodicity,
-    params.dueDayConfig,
-    params.withdrawalDay,
-    params.firstDueDate,
-    params.responsibleMemberId,
-    params.createdByMemberId,
-  ]);
-  return rows[0];
+  return withTransaction(async (call) => {
+    const rows = await call<RecurringExpenseRecord>('sp_recurring_expense_create', [
+      params.householdId,
+      params.name,
+      params.categoryId,
+      params.amount,
+      params.currencyId,
+      params.periodicity,
+      params.dueDayConfig,
+      params.withdrawalDay,
+      params.firstDueDate,
+      params.responsibleMemberId,
+      params.createdByMemberId,
+    ]);
+    const recurringExpense = rows[0];
+    await call('sp_expense_occurrence_generate_next', [recurringExpense.id, params.householdId]);
+    return recurringExpense;
+  });
 }
 
 export async function updateRecurringExpense(params: {
@@ -103,4 +120,15 @@ export async function deactivateRecurringExpense(
   householdId: number,
 ): Promise<void> {
   await callProcedure('sp_recurring_expense_deactivate', [recurringExpenseId, householdId]);
+}
+
+export async function generateNextOccurrence(
+  recurringExpenseId: number,
+  householdId: number,
+): Promise<ExpenseOccurrenceRecord> {
+  const rows = await callProcedure<ExpenseOccurrenceRecord>('sp_expense_occurrence_generate_next', [
+    recurringExpenseId,
+    householdId,
+  ]);
+  return rows[0];
 }

@@ -12,6 +12,12 @@ function createPool(): mysql.Pool {
     // DECIMAL columns vuelven como number en vez de string — más simple para
     // matemática de montos en una app de este tamaño.
     decimalNumbers: true,
+    // DATE/DATETIME/TIMESTAMP columns vuelven como string ('YYYY-MM-DD' /
+    // 'YYYY-MM-DD HH:MM:SS') en vez de Date — coincide con cómo ya están
+    // tipadas todas las RowDataPacket interfaces en src/lib/db/procedures
+    // (created_at, expires_at, due_date, etc. son todas `string`), y evita
+    // desfases de timezone entre el Date del driver y el DATE almacenado.
+    dateStrings: true,
   });
 }
 
