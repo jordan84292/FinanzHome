@@ -19,6 +19,7 @@ import type { HouseholdMemberRecord } from '@/lib/db/procedures/household';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
 
 const MAX_PERIODS: Record<'weekly' | 'biweekly', number> = { weekly: 5, biweekly: 2 };
+const CRC_ID = 1;
 
 const WEEKDAYS = [
   { value: 1, label: 'Lunes' },
@@ -280,7 +281,7 @@ export function RecurringExpenseForm({
           currencyName="currencyId"
           currencies={currencies}
           defaultAmount={expense?.amount}
-          defaultCurrencyId={expense?.currency_id}
+          defaultCurrencyId={expense?.currency_id ?? CRC_ID}
         />
       </div>
       <div>

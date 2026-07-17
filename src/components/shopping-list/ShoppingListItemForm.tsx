@@ -13,6 +13,7 @@ import type { ShoppingListItemRecord } from '@/lib/db/procedures/shopping-list';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
 
 const initialState: AddItemState | UpdateItemState = { error: null };
+const CRC_ID = 1;
 
 export function ShoppingListItemForm({
   mode,
@@ -69,7 +70,7 @@ export function ShoppingListItemForm({
           currencyName="unitPriceCurrencyId"
           currencies={currencies}
           defaultAmount={item?.unit_price}
-          defaultCurrencyId={item?.unit_price_currency_id}
+          defaultCurrencyId={item?.unit_price_currency_id ?? CRC_ID}
         />
       </div>
       {state.error ? (
