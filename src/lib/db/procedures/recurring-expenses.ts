@@ -17,10 +17,13 @@ export interface RecurringExpenseRecord extends RowDataPacket {
   currency_id: number;
   currency_code: 'CRC' | 'USD';
   currency_symbol: string;
-  periodicity: 'weekly' | 'biweekly' | 'one_time';
+  periodicity: 'weekly' | 'biweekly' | 'monthly' | 'one_time';
   due_day_config: number | null;
   withdrawal_day: number | null;
   first_due_date: string | null;
+  monthly_due_day: number | null;
+  funding_mode: 'full_payment' | 'installments' | null;
+  installment_frequency: 'weekly' | 'biweekly' | null;
   responsible_member_id: number;
   responsible_display_name: string;
   is_active: number;
@@ -67,10 +70,13 @@ export async function createRecurringExpense(params: {
   categoryId: number;
   amount: number;
   currencyId: number;
-  periodicity: 'weekly' | 'biweekly' | 'one_time';
+  periodicity: 'weekly' | 'biweekly' | 'monthly' | 'one_time';
   dueDayConfig: number | null;
   withdrawalDay: number | null;
   firstDueDate: string | null;
+  monthlyDueDay?: number | null;
+  fundingMode?: 'full_payment' | 'installments' | null;
+  installmentFrequency?: 'weekly' | 'biweekly' | null;
   responsibleMemberId: number;
   createdByMemberId: number;
 }): Promise<RecurringExpenseRecord> {
@@ -85,6 +91,9 @@ export async function createRecurringExpense(params: {
       params.dueDayConfig,
       params.withdrawalDay,
       params.firstDueDate,
+      params.monthlyDueDay ?? null,
+      params.fundingMode ?? null,
+      params.installmentFrequency ?? null,
       params.responsibleMemberId,
       params.createdByMemberId,
     ]);
@@ -164,6 +173,20 @@ export async function markOccurrencePaid(params: {
       params.householdId,
     ]);
     await call('sp_expense_occurrence_shares_snapshot', [nextOccurrenceRows[0].id, params.householdId]);
+    try {
+      // Only meaningful for periodicity='monthly' + funding_mode='installments'
+      // expenses; the SP itself SIGNALs for anything else, which we ignore here
+      // exactly like confirmPurchaseAction ignores initSplit failing for a
+      // shopping list nobody split — the occurrence/shares work above already
+      // succeeded and must not be reported as a failure to the caller.
+      await call('sp_expense_installment_generate_for_month', [
+        paidOccurrence.recurring_expense_id,
+        params.householdId,
+        nextOccurrenceRows[0].period_start,
+      ]);
+    } catch {
+      // not an installments-funded monthly expense — nothing to generate
+    }
     return call<ExpenseOccurrenceRecord>('sp_expense_occurrence_list', [
       paidOccurrence.recurring_expense_id,
       params.householdId,

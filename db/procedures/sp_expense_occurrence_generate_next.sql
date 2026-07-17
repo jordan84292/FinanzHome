@@ -6,15 +6,17 @@ CREATE PROCEDURE sp_expense_occurrence_generate_next(
 )
 BEGIN
   DECLARE v_exists INT;
-  DECLARE v_periodicity ENUM('weekly', 'biweekly', 'one_time');
+  DECLARE v_periodicity ENUM('weekly', 'biweekly', 'monthly', 'one_time');
   DECLARE v_due_day_config TINYINT UNSIGNED;
   DECLARE v_first_due_date DATE;
+  DECLARE v_monthly_due_day TINYINT UNSIGNED;
   DECLARE v_open_count INT;
   DECLARE v_occurrence_count INT;
   DECLARE v_last_period_end DATE;
   DECLARE v_last_due_date DATE;
   DECLARE v_start_date DATE;
   DECLARE v_due_date DATE;
+  DECLARE v_next_month_first DATE;
 
   SELECT COUNT(*) INTO v_exists
   FROM recurring_expenses
@@ -24,8 +26,8 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Recurring expense not found in this household';
   END IF;
 
-  SELECT periodicity, due_day_config, first_due_date
-  INTO v_periodicity, v_due_day_config, v_first_due_date
+  SELECT periodicity, due_day_config, first_due_date, monthly_due_day
+  INTO v_periodicity, v_due_day_config, v_first_due_date, v_monthly_due_day
   FROM recurring_expenses
   WHERE id = p_recurring_expense_id;
 
@@ -76,6 +78,29 @@ BEGIN
       ELSE
         SET v_start_date = DATE_ADD(v_last_due_date, INTERVAL 1 DAY);
         SET v_due_date = DATE_ADD(v_last_due_date, INTERVAL 14 DAY);
+      END IF;
+
+      INSERT INTO expense_occurrences (recurring_expense_id, period_start, period_end, due_date)
+      VALUES (p_recurring_expense_id, v_start_date, v_due_date, v_due_date);
+    -- monthly: due date is monthly_due_day clamped to each month's actual length
+    -- (LEAST/LAST_DAY, same clamping formula used in sp_reminder_get_pending's
+    -- overdue_daily math). Anchored to the previous occurrence's month, never
+    -- to CURDATE(), for the same reason as weekly/biweekly above.
+    ELSEIF v_periodicity = 'monthly' THEN
+      SELECT MAX(due_date) INTO v_last_due_date
+      FROM expense_occurrences
+      WHERE recurring_expense_id = p_recurring_expense_id;
+
+      IF v_last_due_date IS NULL THEN
+        SET v_start_date = DATE_SUB(CURDATE(), INTERVAL DAY(CURDATE()) - 1 DAY);
+        SET v_due_date = DATE_ADD(v_start_date, INTERVAL LEAST(v_monthly_due_day, DAY(LAST_DAY(v_start_date))) - 1 DAY);
+        IF v_due_date < CURDATE() THEN
+          SET v_start_date = DATE_ADD(LAST_DAY(v_start_date), INTERVAL 1 DAY);
+          SET v_due_date = DATE_ADD(v_start_date, INTERVAL LEAST(v_monthly_due_day, DAY(LAST_DAY(v_start_date))) - 1 DAY);
+        END IF;
+      ELSE
+        SET v_start_date = DATE_ADD(LAST_DAY(v_last_due_date), INTERVAL 1 DAY);
+        SET v_due_date = DATE_ADD(v_start_date, INTERVAL LEAST(v_monthly_due_day, DAY(LAST_DAY(v_start_date))) - 1 DAY);
       END IF;
 
       INSERT INTO expense_occurrences (recurring_expense_id, period_start, period_end, due_date)

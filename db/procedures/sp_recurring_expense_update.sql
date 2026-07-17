@@ -45,6 +45,7 @@ BEGIN
     re.id, re.household_id, re.name, re.category_id, ec.name AS category_name,
     re.amount, re.currency_id, c.code AS currency_code, c.symbol AS currency_symbol,
     re.periodicity, re.due_day_config, re.withdrawal_day, re.first_due_date,
+    re.monthly_due_day, re.funding_mode, re.installment_frequency,
     re.responsible_member_id, hm.display_name AS responsible_display_name,
     re.is_active, re.created_at
   FROM recurring_expenses re

@@ -1,9 +1,82 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
-import { getOccurrencesAction, markOccurrencePaidAction } from '@/app/gastos/actions';
+import {
+  getOccurrencesAction,
+  markOccurrencePaidAction,
+  getInstallmentsAction,
+  markInstallmentPaidAction,
+} from '@/app/gastos/actions';
 import { showError, showSuccess } from '@/lib/ui/alerts';
 import type { ExpenseOccurrenceRecord, RecurringExpenseRecord } from '@/lib/db/procedures/recurring-expenses';
+import type { ExpenseInstallmentRecord } from '@/lib/db/procedures/expense-installments';
+
+function InstallmentsSection({ recurringExpenseId }: { recurringExpenseId: number }) {
+  const [installments, setInstallments] = useState<ExpenseInstallmentRecord[] | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    getInstallmentsAction(recurringExpenseId).then((result) => {
+      if (result.error) {
+        showError(result.error);
+        return;
+      }
+      setInstallments(result.installments);
+    });
+  }, [recurringExpenseId]);
+
+  function handleMarkPaid(installmentId: number): void {
+    startTransition(() => {
+      markInstallmentPaidAction(installmentId).then((result) => {
+        if (result.error) {
+          showError(result.error);
+          return;
+        }
+        setInstallments((prev) =>
+          prev ? prev.map((i) => (i.id === installmentId ? result.installment! : i)) : prev,
+        );
+        showSuccess('Cuota marcada como apartada.');
+      });
+    });
+  }
+
+  if (installments === null) {
+    return <p className="text-body-secondary">Cargando cuotas…</p>;
+  }
+
+  if (installments.length === 0) {
+    return (
+      <p className="text-body-secondary small">
+        Todavía no hay cuotas generadas — configurá el % por periodo en &quot;Editar&quot;.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="list-group mb-3">
+      {installments.map((installment) => (
+        <li key={installment.id} className="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <div>{installment.due_date}</div>
+            <div className="text-body-secondary small">{installment.amount} ({installment.percentage}%)</div>
+          </div>
+          {installment.is_paid ? (
+            <span className="badge text-bg-success">Apartada</span>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-outline-primary btn-sm"
+              disabled={isPending}
+              onClick={() => handleMarkPaid(installment.id)}
+            >
+              Marcar apartada
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function ExpenseDetailPanel({
   expense,
@@ -81,6 +154,13 @@ export function ExpenseDetailPanel({
           >
             {isPending ? 'Guardando…' : `Marcar como pagado (vence ${nextUnpaid.due_date})`}
           </button>
+        ) : null}
+
+        {expense.periodicity === 'monthly' && expense.funding_mode === 'installments' ? (
+          <>
+            <h3 className="h6 text-body-secondary text-uppercase">Cuotas de este mes</h3>
+            <InstallmentsSection recurringExpenseId={expense.id} />
+          </>
         ) : null}
 
         <h3 className="h6 text-body-secondary text-uppercase">Historial</h3>

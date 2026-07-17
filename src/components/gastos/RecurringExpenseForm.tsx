@@ -6,6 +6,8 @@ import {
   updateRecurringExpenseAction,
   getRecurringExpenseSharesAction,
   setRecurringExpenseSharesAction,
+  getInstallmentSharesAction,
+  setInstallmentSharesAction,
   type CreateRecurringExpenseState,
   type UpdateRecurringExpenseState,
 } from '@/app/gastos/actions';
@@ -15,6 +17,8 @@ import type { ExpenseCategoryRecord, RecurringExpenseRecord } from '@/lib/db/pro
 import type { ExpenseShareRecord } from '@/lib/db/procedures/expense-shares';
 import type { HouseholdMemberRecord } from '@/lib/db/procedures/household';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
+
+const MAX_PERIODS: Record<'weekly' | 'biweekly', number> = { weekly: 5, biweekly: 2 };
 
 const WEEKDAYS = [
   { value: 1, label: 'Lunes' },
@@ -125,6 +129,99 @@ function ExpenseSharesSection({
   );
 }
 
+function InstallmentSharesSection({
+  recurringExpenseId,
+  installmentFrequency,
+}: {
+  recurringExpenseId: number;
+  installmentFrequency: 'weekly' | 'biweekly';
+}) {
+  const [percentages, setPercentages] = useState<Record<number, number> | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const periods = Array.from({ length: MAX_PERIODS[installmentFrequency] }, (_, i) => i + 1);
+
+  useEffect(() => {
+    getInstallmentSharesAction(recurringExpenseId).then((result) => {
+      if (result.error) {
+        showError(result.error);
+        return;
+      }
+      const initial: Record<number, number> = {};
+      for (const period of periods) {
+        initial[period] = result.shares.find((s) => s.period_index === period)?.percentage ?? 0;
+      }
+      setPercentages(initial);
+    });
+    // periods depends only on installmentFrequency, which doesn't change per instance
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recurringExpenseId]);
+
+  if (percentages === null) {
+    return <p className="text-body-secondary">Cargando cuotas…</p>;
+  }
+
+  const sum = Object.values(percentages).reduce((acc, value) => acc + value, 0);
+  const sumIsValid = Math.abs(sum - 100) < 0.001;
+  const periodLabel = installmentFrequency === 'weekly' ? 'Semana' : 'Quincena';
+
+  function handleSave(): void {
+    const sharesToSave = periods.map((period) => ({
+      periodIndex: period,
+      percentage: percentages![period] ?? 0,
+    }));
+    startTransition(() => {
+      setInstallmentSharesAction(recurringExpenseId, sharesToSave).then((result) => {
+        if (result.error) {
+          showError(result.error);
+          return;
+        }
+        showSuccess('Calendario de cuotas guardado.');
+      });
+    });
+  }
+
+  return (
+    <div className="border rounded p-3">
+      <h3 className="h6 mb-1">Porcentaje por periodo</h3>
+      <p className="text-body-secondary small">
+        Qué % del monto mensual se aparta cada {periodLabel.toLowerCase()}, hasta juntar el 100% para la fecha de vencimiento.
+      </p>
+      <div className="d-flex flex-column gap-2">
+        {periods.map((period) => (
+          <div key={period} className="d-flex align-items-center gap-2">
+            <span className="flex-grow-1">
+              {periodLabel} {period}
+            </span>
+            <div className="input-group" style={{ maxWidth: 120 }}>
+              <input
+                type="number"
+                step="0.01"
+                min={0}
+                max={100}
+                className="form-control"
+                value={percentages[period] ?? 0}
+                onChange={(e) =>
+                  setPercentages((prev) => ({ ...prev, [period]: Number(e.target.value) }))
+                }
+              />
+              <span className="input-group-text">%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className={`mt-2 ${sumIsValid ? 'text-success' : 'text-danger'}`}>Total: {sum.toFixed(2)}%</div>
+      <button
+        type="button"
+        className="btn btn-outline-primary btn-sm mt-2"
+        disabled={!sumIsValid || isPending}
+        onClick={handleSave}
+      >
+        {isPending ? 'Guardando…' : 'Guardar calendario'}
+      </button>
+    </div>
+  );
+}
+
 export function RecurringExpenseForm({
   mode,
   expense,
@@ -142,9 +239,11 @@ export function RecurringExpenseForm({
 }) {
   const action = mode === 'create' ? createRecurringExpenseAction : updateRecurringExpenseAction;
   const [state, formAction, pending] = useActionState(action, initialState);
-  const [periodicity, setPeriodicity] = useState<'weekly' | 'biweekly' | 'one_time'>(
+  const [periodicity, setPeriodicity] = useState<'weekly' | 'biweekly' | 'monthly' | 'one_time'>(
     expense?.periodicity ?? 'weekly',
   );
+  const [fundingMode, setFundingMode] = useState<'full_payment' | 'installments'>('full_payment');
+  const [installmentFrequency, setInstallmentFrequency] = useState<'weekly' | 'biweekly'>('weekly');
   const wasPending = useRef(false);
 
   useEffect(() => {
@@ -203,6 +302,12 @@ export function RecurringExpenseForm({
       {mode === 'edit' && expense ? (
         <ExpenseSharesSection recurringExpenseId={expense.id} members={members} />
       ) : null}
+      {mode === 'edit' && expense?.periodicity === 'monthly' && expense.funding_mode === 'installments' ? (
+        <InstallmentSharesSection
+          recurringExpenseId={expense.id}
+          installmentFrequency={expense.installment_frequency ?? 'weekly'}
+        />
+      ) : null}
       {mode === 'create' ? (
         <>
           <div>
@@ -212,10 +317,11 @@ export function RecurringExpenseForm({
               name="periodicity"
               className="form-select"
               value={periodicity}
-              onChange={(e) => setPeriodicity(e.target.value as 'weekly' | 'biweekly' | 'one_time')}
+              onChange={(e) => setPeriodicity(e.target.value as 'weekly' | 'biweekly' | 'monthly' | 'one_time')}
             >
               <option value="weekly">Semanal</option>
               <option value="biweekly">Quincenal</option>
+              <option value="monthly">Mensual</option>
               <option value="one_time">Pago único</option>
             </select>
           </div>
@@ -250,6 +356,53 @@ export function RecurringExpenseForm({
               <label htmlFor="firstDueDate" className="form-label">Fecha de vencimiento</label>
               <input id="firstDueDate" name="firstDueDate" type="date" className="form-control" required />
             </div>
+          ) : null}
+          {periodicity === 'monthly' ? (
+            <>
+              <div>
+                <label htmlFor="monthlyDueDay" className="form-label">Día del mes de vencimiento (1-31)</label>
+                <input
+                  id="monthlyDueDay"
+                  name="monthlyDueDay"
+                  type="number"
+                  min={1}
+                  max={31}
+                  className="form-control"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="fundingMode" className="form-label">¿Cómo se paga?</label>
+                <select
+                  id="fundingMode"
+                  name="fundingMode"
+                  className="form-select"
+                  value={fundingMode}
+                  onChange={(e) => setFundingMode(e.target.value as 'full_payment' | 'installments')}
+                >
+                  <option value="full_payment">Pago completo el día de vencimiento</option>
+                  <option value="installments">Ir apartando por cuotas</option>
+                </select>
+              </div>
+              {fundingMode === 'installments' ? (
+                <div>
+                  <label htmlFor="installmentFrequency" className="form-label">Frecuencia de las cuotas</label>
+                  <select
+                    id="installmentFrequency"
+                    name="installmentFrequency"
+                    className="form-select"
+                    value={installmentFrequency}
+                    onChange={(e) => setInstallmentFrequency(e.target.value as 'weekly' | 'biweekly')}
+                  >
+                    <option value="weekly">Semanal</option>
+                    <option value="biweekly">Quincenal</option>
+                  </select>
+                  <div className="form-text">
+                    Después de guardar, abrí &quot;Editar&quot; en este gasto para configurar el % de cada periodo.
+                  </div>
+                </div>
+              ) : null}
+            </>
           ) : null}
         </>
       ) : null}

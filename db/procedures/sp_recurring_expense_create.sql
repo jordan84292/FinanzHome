@@ -6,10 +6,13 @@ CREATE PROCEDURE sp_recurring_expense_create(
   IN p_category_id SMALLINT UNSIGNED,
   IN p_amount DECIMAL(12,2),
   IN p_currency_id TINYINT UNSIGNED,
-  IN p_periodicity ENUM('weekly', 'biweekly', 'one_time'),
+  IN p_periodicity ENUM('weekly', 'biweekly', 'monthly', 'one_time'),
   IN p_due_day_config TINYINT UNSIGNED,
   IN p_withdrawal_day TINYINT UNSIGNED,
   IN p_first_due_date DATE,
+  IN p_monthly_due_day TINYINT UNSIGNED,
+  IN p_funding_mode ENUM('full_payment', 'installments'),
+  IN p_installment_frequency ENUM('weekly', 'biweekly'),
   IN p_responsible_member_id INT UNSIGNED,
   IN p_created_by_member_id INT UNSIGNED
 )
@@ -35,16 +38,19 @@ BEGIN
 
   INSERT INTO recurring_expenses (
     household_id, name, category_id, amount, currency_id, periodicity,
-    due_day_config, withdrawal_day, first_due_date, responsible_member_id, created_by_member_id
+    due_day_config, withdrawal_day, first_due_date, monthly_due_day, funding_mode,
+    installment_frequency, responsible_member_id, created_by_member_id
   ) VALUES (
     p_household_id, p_name, p_category_id, p_amount, p_currency_id, p_periodicity,
-    p_due_day_config, p_withdrawal_day, p_first_due_date, p_responsible_member_id, p_created_by_member_id
+    p_due_day_config, p_withdrawal_day, p_first_due_date, p_monthly_due_day, p_funding_mode,
+    p_installment_frequency, p_responsible_member_id, p_created_by_member_id
   );
 
   SELECT
     re.id, re.household_id, re.name, re.category_id, ec.name AS category_name,
     re.amount, re.currency_id, c.code AS currency_code, c.symbol AS currency_symbol,
     re.periodicity, re.due_day_config, re.withdrawal_day, re.first_due_date,
+    re.monthly_due_day, re.funding_mode, re.installment_frequency,
     re.responsible_member_id, hm.display_name AS responsible_display_name,
     re.is_active, re.created_at
   FROM recurring_expenses re

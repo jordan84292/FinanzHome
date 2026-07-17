@@ -16,8 +16,17 @@ import {
   setRecurringExpenseShares,
   type ExpenseShareRecord,
 } from '@/lib/db/procedures/expense-shares';
+import {
+  generateInstallmentsForMonth,
+  listInstallments,
+  listInstallmentShares,
+  markInstallmentPaid,
+  setInstallmentShares,
+  type ExpenseInstallmentRecord,
+  type ExpenseInstallmentShareRecord,
+} from '@/lib/db/procedures/expense-installments';
 
-const periodicitySchema = z.enum(['weekly', 'biweekly', 'one_time']);
+const periodicitySchema = z.enum(['weekly', 'biweekly', 'monthly', 'one_time']);
 
 const createRecurringExpenseSchema = z
   .object({
@@ -29,6 +38,9 @@ const createRecurringExpenseSchema = z
     dueDayConfig: z.coerce.number().int().min(1).max(7).optional(),
     withdrawalDay: z.coerce.number().int().min(1).max(31).optional(),
     firstDueDate: z.iso.date('Fecha inválida').optional(),
+    monthlyDueDay: z.coerce.number().int().min(1).max(31).optional(),
+    fundingMode: z.enum(['full_payment', 'installments']).optional(),
+    installmentFrequency: z.enum(['weekly', 'biweekly']).optional(),
     responsibleMemberId: z.coerce.number().int().positive(),
   })
   .superRefine((data, ctx) => {
@@ -40,6 +52,17 @@ const createRecurringExpenseSchema = z
     }
     if (data.periodicity === 'one_time' && !data.firstDueDate) {
       ctx.addIssue({ code: 'custom', message: 'Elegí la fecha de vencimiento', path: ['firstDueDate'] });
+    }
+    if (data.periodicity === 'monthly') {
+      if (data.monthlyDueDay === undefined) {
+        ctx.addIssue({ code: 'custom', message: 'Elegí el día del mes de vencimiento', path: ['monthlyDueDay'] });
+      }
+      if (data.fundingMode === undefined) {
+        ctx.addIssue({ code: 'custom', message: 'Elegí cómo se paga este gasto', path: ['fundingMode'] });
+      }
+      if (data.fundingMode === 'installments' && data.installmentFrequency === undefined) {
+        ctx.addIssue({ code: 'custom', message: 'Elegí la frecuencia de las cuotas', path: ['installmentFrequency'] });
+      }
     }
   });
 
@@ -62,6 +85,9 @@ export async function createRecurringExpenseAction(
     dueDayConfig: formData.get('dueDayConfig') || undefined,
     withdrawalDay: formData.get('withdrawalDay') || undefined,
     firstDueDate: formData.get('firstDueDate') || undefined,
+    monthlyDueDay: formData.get('monthlyDueDay') || undefined,
+    fundingMode: formData.get('fundingMode') || undefined,
+    installmentFrequency: formData.get('installmentFrequency') || undefined,
     responsibleMemberId: formData.get('responsibleMemberId'),
   });
   if (!parsed.success) {
@@ -77,8 +103,17 @@ export async function createRecurringExpenseAction(
       currencyId: parsed.data.currencyId,
       periodicity: parsed.data.periodicity,
       dueDayConfig: parsed.data.periodicity === 'weekly' ? parsed.data.dueDayConfig! : null,
-      withdrawalDay: parsed.data.periodicity !== 'one_time' ? parsed.data.withdrawalDay! : null,
+      withdrawalDay:
+        parsed.data.periodicity === 'weekly' || parsed.data.periodicity === 'biweekly'
+          ? parsed.data.withdrawalDay!
+          : null,
       firstDueDate: parsed.data.periodicity === 'one_time' ? parsed.data.firstDueDate! : null,
+      monthlyDueDay: parsed.data.periodicity === 'monthly' ? parsed.data.monthlyDueDay! : null,
+      fundingMode: parsed.data.periodicity === 'monthly' ? parsed.data.fundingMode! : null,
+      installmentFrequency:
+        parsed.data.periodicity === 'monthly' && parsed.data.fundingMode === 'installments'
+          ? parsed.data.installmentFrequency!
+          : null,
       responsibleMemberId: parsed.data.responsibleMemberId,
       createdByMemberId: membership.member_id,
     });
@@ -211,5 +246,89 @@ export async function setRecurringExpenseSharesAction(
     return { shares: result, error: null };
   } catch {
     return { shares: [], error: 'Los porcentajes deben sumar 100%.' };
+  }
+}
+
+export interface GetInstallmentSharesState {
+  shares: ExpenseInstallmentShareRecord[];
+  error: string | null;
+}
+
+export async function getInstallmentSharesAction(recurringExpenseId: number): Promise<GetInstallmentSharesState> {
+  const membership = await requireMembership();
+  try {
+    const shares = await listInstallmentShares(recurringExpenseId, membership.id);
+    return { shares, error: null };
+  } catch {
+    return { shares: [], error: 'No se pudo cargar el calendario de cuotas.' };
+  }
+}
+
+export interface SetInstallmentSharesState {
+  shares: ExpenseInstallmentShareRecord[];
+  error: string | null;
+}
+
+const CURRENT_MONTH_START = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+};
+
+export async function setInstallmentSharesAction(
+  recurringExpenseId: number,
+  shares: Array<{ periodIndex: number; percentage: number }>,
+): Promise<SetInstallmentSharesState> {
+  const membership = await requireMembership();
+  try {
+    const result = await setInstallmentShares({ recurringExpenseId, householdId: membership.id, shares });
+    try {
+      await generateInstallmentsForMonth({
+        recurringExpenseId,
+        householdId: membership.id,
+        monthStart: CURRENT_MONTH_START(),
+      });
+    } catch {
+      // El mes actual ya pudo haberse generado antes, o el reparto quedó
+      // vacío (0 filas) — ninguno de los dos casos es un error para el usuario.
+    }
+    revalidatePath('/gastos');
+    return { shares: result, error: null };
+  } catch {
+    return { shares: [], error: 'Los porcentajes deben sumar 100%.' };
+  }
+}
+
+export interface GetInstallmentsState {
+  installments: ExpenseInstallmentRecord[];
+  error: string | null;
+}
+
+export async function getInstallmentsAction(recurringExpenseId: number): Promise<GetInstallmentsState> {
+  const membership = await requireMembership();
+  try {
+    const installments = await listInstallments(recurringExpenseId, membership.id);
+    return { installments, error: null };
+  } catch {
+    return { installments: [], error: 'No se pudo cargar el historial de cuotas.' };
+  }
+}
+
+export interface MarkInstallmentPaidState {
+  installment: ExpenseInstallmentRecord | null;
+  error: string | null;
+}
+
+export async function markInstallmentPaidAction(installmentId: number): Promise<MarkInstallmentPaidState> {
+  const membership = await requireMembership();
+  try {
+    const installment = await markInstallmentPaid({
+      installmentId,
+      householdId: membership.id,
+      paidByMemberId: membership.member_id,
+    });
+    revalidatePath('/gastos');
+    return { installment, error: null };
+  } catch {
+    return { installment: null, error: 'No se pudo marcar la cuota como pagada.' };
   }
 }
