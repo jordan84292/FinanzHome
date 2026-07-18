@@ -130,21 +130,27 @@ export function ShoppingListClient({
 
       {displayItems.length > 0 ? (
         <div
-          className="position-fixed bottom-0 start-0 w-100 bg-body border-top p-3 d-flex justify-content-between align-items-center"
+          className="position-fixed bottom-0 start-0 w-100 bg-body border-top p-3"
           style={{ zIndex: 1040 }}
         >
-          <div>
-            <div className="text-body-secondary small">Total estimado</div>
-            <div className="h5 mb-0">
-              {displayCurrencySymbol}
-              {displayList.total_estimated_live ?? 0}
+          <div className="d-flex justify-content-between align-items-center mb-2">
+            <div>
+              <div className="text-body-secondary small">Total estimado</div>
+              <div className="h5 mb-0">
+                {displayCurrencySymbol}
+                {displayList.total_estimated_live ?? 0}
+              </div>
             </div>
+            <ConfirmPurchaseButton
+              shoppingListId={displayList.id}
+              disabled={!isOnline}
+              onConfirmed={setConfirmedListId}
+            />
           </div>
-          <ConfirmPurchaseButton
-            shoppingListId={displayList.id}
-            disabled={!isOnline}
-            onConfirmed={setConfirmedListId}
-          />
+          <Link href="/inventario" className="btn btn-outline-secondary btn-sm w-100">
+            <i className="bi bi-arrow-left me-1" />
+            Volver a inventario sin confirmar
+          </Link>
         </div>
       ) : null}
 

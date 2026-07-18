@@ -159,6 +159,19 @@ export async function generateNextOccurrence(
   return rows[0];
 }
 
+export async function updateOccurrenceDueDate(params: {
+  occurrenceId: number;
+  householdId: number;
+  dueDate: string;
+}): Promise<ExpenseOccurrenceRecord> {
+  const rows = await callProcedure<ExpenseOccurrenceRecord>('sp_expense_occurrence_update_due_date', [
+    params.occurrenceId,
+    params.householdId,
+    params.dueDate,
+  ]);
+  return rows[0];
+}
+
 export async function listOccurrences(
   recurringExpenseId: number,
   householdId: number,

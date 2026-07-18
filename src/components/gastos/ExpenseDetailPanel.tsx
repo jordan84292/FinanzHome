@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react';
 import {
   getOccurrencesAction,
   markOccurrencePaidAction,
+  updateOccurrenceDueDateAction,
   getInstallmentsAction,
   markInstallmentPaidAction,
 } from '@/app/gastos/actions';
@@ -94,6 +95,8 @@ export function ExpenseDetailPanel({
   const [occurrences, setOccurrences] = useState<ExpenseOccurrenceRecord[] | null>(null);
   const [hasError, setHasError] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [isEditingDate, setIsEditingDate] = useState(false);
+  const [editedDate, setEditedDate] = useState('');
 
   useEffect(() => {
     getOccurrencesAction(expense.id).then((result) => {
@@ -118,6 +121,29 @@ export function ExpenseDetailPanel({
         }
         setOccurrences(result.occurrences);
         showSuccess('Gasto marcado como pagado.');
+      });
+    });
+  }
+
+  function handleStartEditDate(): void {
+    if (!nextUnpaid) return;
+    setEditedDate(nextUnpaid.due_date);
+    setIsEditingDate(true);
+  }
+
+  function handleSaveDate(): void {
+    if (!nextUnpaid || !editedDate) return;
+    startTransition(() => {
+      updateOccurrenceDueDateAction(nextUnpaid.id, editedDate).then((result) => {
+        if (result.error) {
+          showError(result.error);
+          return;
+        }
+        setOccurrences((prev) =>
+          prev ? prev.map((o) => (o.id === nextUnpaid.id ? result.occurrence! : o)) : prev,
+        );
+        setIsEditingDate(false);
+        showSuccess('Fecha actualizada.');
       });
     });
   }
@@ -159,15 +185,46 @@ export function ExpenseDetailPanel({
           )}
         </div>
 
-        {expense.is_active === 1 && nextUnpaid ? (
-          <button
-            type="button"
-            className="btn btn-primary w-100 mb-3"
-            disabled={isPending}
-            onClick={handleMarkPaid}
-          >
-            {isPending ? 'Guardando…' : `Marcar como pagado (vence ${nextUnpaid.due_date})`}
-          </button>
+        {expense.is_active === 1 && nextUnpaid && isEditingDate ? (
+          <div className="input-group mb-3">
+            <input
+              type="date"
+              className="form-control"
+              value={editedDate}
+              onChange={(e) => setEditedDate(e.target.value)}
+            />
+            <button type="button" className="btn btn-primary" disabled={isPending} onClick={handleSaveDate}>
+              Guardar
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              disabled={isPending}
+              onClick={() => setIsEditingDate(false)}
+            >
+              Cancelar
+            </button>
+          </div>
+        ) : expense.is_active === 1 && nextUnpaid ? (
+          <div className="d-flex gap-2 mb-3">
+            <button
+              type="button"
+              className="btn btn-primary flex-grow-1"
+              disabled={isPending}
+              onClick={handleMarkPaid}
+            >
+              {isPending ? 'Guardando…' : `Marcar como pagado (vence ${nextUnpaid.due_date})`}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              disabled={isPending}
+              onClick={handleStartEditDate}
+              aria-label="Editar fecha de vencimiento"
+            >
+              <i className="bi bi-pencil" />
+            </button>
+          </div>
         ) : null}
 
         {expense.periodicity === 'monthly' && expense.funding_mode === 'installments' ? (

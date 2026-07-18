@@ -9,6 +9,7 @@ import {
   reactivateRecurringExpense,
   listOccurrences,
   markOccurrencePaid,
+  updateOccurrenceDueDate,
   updateRecurringExpense,
   type ExpenseOccurrenceRecord,
 } from '@/lib/db/procedures/recurring-expenses';
@@ -219,6 +220,33 @@ export async function markOccurrencePaidAction(occurrenceId: number): Promise<Ma
     return { occurrences, error: null };
   } catch {
     return { occurrences: [], error: 'No se pudo marcar el gasto como pagado.' };
+  }
+}
+
+export interface UpdateOccurrenceDueDateState {
+  occurrence: ExpenseOccurrenceRecord | null;
+  error: string | null;
+}
+
+export async function updateOccurrenceDueDateAction(
+  occurrenceId: number,
+  dueDate: string,
+): Promise<UpdateOccurrenceDueDateState> {
+  const membership = await requireMembership();
+  const parsed = z.iso.date('Fecha inválida').safeParse(dueDate);
+  if (!parsed.success) {
+    return { occurrence: null, error: parsed.error.issues[0]?.message ?? 'Fecha inválida' };
+  }
+  try {
+    const occurrence = await updateOccurrenceDueDate({
+      occurrenceId,
+      householdId: membership.id,
+      dueDate: parsed.data,
+    });
+    revalidatePath('/gastos');
+    return { occurrence, error: null };
+  } catch {
+    return { occurrence: null, error: 'No se pudo actualizar la fecha. Es posible que el gasto ya esté pagado.' };
   }
 }
 
