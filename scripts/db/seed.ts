@@ -2,7 +2,8 @@
 // lib/db/pool.ts, which builds its connection pool at module-load time) is
 // imported — ES module imports are hoisted ahead of top-level code, so a
 // dotenv.config() call here would run too late. Run this script with
-// `node --env-file=.env.local` (or the npm script that does it for you).
+// `node --env-file=.env.local` (or `--env-file=.env.production.local` for
+// prod) — see the db:seed npm script for the local-dev invocation.
 import { registerNewUser } from '@/lib/auth/register-user';
 import { createHousehold, createInvitation, acceptInvitation } from '@/lib/db/procedures/household';
 import { updatePaymentSchedule } from '@/lib/db/procedures/profile';
@@ -28,7 +29,7 @@ const CRC_ID = 1;
 // unit ids from units_of_measure: 1=unidad 2=kg 3=g 4=l 5=ml 6=paquete 7=docena
 // category ids from product_categories: 1=Despensa 2=Limpieza 3=Higiene personal 4=Bebidas
 async function main(): Promise<void> {
-  console.log('Seeding demo data into local dev DB...');
+  console.log('Seeding demo data...');
 
   // --- Household + members -------------------------------------------------
   const jordan = await registerNewUser({ email: 'demo@finanzhome.app', password: 'Demo1234', name: 'Jordan González' });
@@ -107,49 +108,23 @@ async function main(): Promise<void> {
   // ya se llevó el stock a "óptimo").
   await pool.query('UPDATE products SET current_quantity = 1 WHERE household_id = ? AND name IN (?, ?)', [household.id, 'Arroz', 'Café']);
 
-  // --- Gastos recurrentes ------------------------------------------------------
-  const [servicesCategoryRow] = await pool.query('SELECT id FROM expense_categories WHERE name = ?', ['Servicios']);
-  const servicesCategoryId = (servicesCategoryRow as { id: number }[])[0].id;
-  const [housingCategoryRow] = await pool.query('SELECT id FROM expense_categories WHERE name = ?', ['Vivienda']);
-  const housingCategoryId = (housingCategoryRow as { id: number }[])[0].id;
-
-  const internet = await createRecurringExpense({
-    householdId: household.id,
-    name: 'Internet',
-    categoryId: servicesCategoryId,
-    amount: 15000,
-    currencyId: CRC_ID,
-    periodicity: 'weekly',
-    dueDayConfig: 5,
-    withdrawalDay: 5,
-    firstDueDate: null,
-    responsibleMemberId: jordanMemberId,
-    createdByMemberId: jordanMemberId,
-  });
-  await setRecurringExpenseShares({
-    recurringExpenseId: internet.id,
-    householdId: household.id,
-    shares: [{ memberId: jordanMemberId, percentage: 50 }, { memberId: mariaMemberId, percentage: 50 }],
-  });
-
-  await createRecurringExpense({
-    householdId: household.id,
-    name: 'Cable',
-    categoryId: servicesCategoryId,
-    amount: 8000,
-    currencyId: CRC_ID,
-    periodicity: 'biweekly',
-    dueDayConfig: null,
-    withdrawalDay: 10,
-    firstDueDate: null,
-    responsibleMemberId: mariaMemberId,
-    createdByMemberId: jordanMemberId,
-  });
+  // --- Gastos recurrentes: una variante por categoría para que el dashboard
+  // muestre varias porciones en "gasto por categoría" y una curva real en
+  // "evolución mensual" -------------------------------------------------------
+  async function categoryId(name: string): Promise<number> {
+    const [rows] = await pool.query('SELECT id FROM expense_categories WHERE name = ?', [name]);
+    return (rows as { id: number }[])[0].id;
+  }
+  const viviendaId = await categoryId('Vivienda');
+  const serviciosId = await categoryId('Servicios');
+  const transporteId = await categoryId('Transporte');
+  const saludId = await categoryId('Salud');
+  const entretenimientoId = await categoryId('Entretenimiento');
 
   const alquiler = await createRecurringExpense({
     householdId: household.id,
     name: 'Alquiler',
-    categoryId: housingCategoryId,
+    categoryId: viviendaId,
     amount: 350000,
     currencyId: CRC_ID,
     periodicity: 'monthly',
@@ -168,11 +143,66 @@ async function main(): Promise<void> {
     shares: [{ memberId: jordanMemberId, percentage: 60 }, { memberId: mariaMemberId, percentage: 40 }],
   });
 
+  const internet = await createRecurringExpense({
+    householdId: household.id,
+    name: 'Internet',
+    categoryId: serviciosId,
+    amount: 15000,
+    currencyId: CRC_ID,
+    periodicity: 'weekly',
+    dueDayConfig: 5,
+    withdrawalDay: 5,
+    firstDueDate: null,
+    responsibleMemberId: jordanMemberId,
+    createdByMemberId: jordanMemberId,
+  });
+  await setRecurringExpenseShares({
+    recurringExpenseId: internet.id,
+    householdId: household.id,
+    shares: [{ memberId: jordanMemberId, percentage: 50 }, { memberId: mariaMemberId, percentage: 50 }],
+  });
+
+  const electricidad = await createRecurringExpense({
+    householdId: household.id,
+    name: 'Electricidad',
+    categoryId: serviciosId,
+    amount: 45000,
+    currencyId: CRC_ID,
+    periodicity: 'monthly',
+    dueDayConfig: null,
+    withdrawalDay: null,
+    firstDueDate: null,
+    monthlyDueDay: 20,
+    fundingMode: 'full_payment',
+    installmentFrequency: null,
+    responsibleMemberId: mariaMemberId,
+    createdByMemberId: jordanMemberId,
+  });
+  await setRecurringExpenseShares({
+    recurringExpenseId: electricidad.id,
+    householdId: household.id,
+    shares: [{ memberId: jordanMemberId, percentage: 50 }, { memberId: mariaMemberId, percentage: 50 }],
+  });
+
+  const gasolina = await createRecurringExpense({
+    householdId: household.id,
+    name: 'Gasolina',
+    categoryId: transporteId,
+    amount: 40000,
+    currencyId: CRC_ID,
+    periodicity: 'biweekly',
+    dueDayConfig: null,
+    withdrawalDay: 12,
+    firstDueDate: null,
+    responsibleMemberId: mariaMemberId,
+    createdByMemberId: jordanMemberId,
+  });
+
   const seguro = await createRecurringExpense({
     householdId: household.id,
-    name: 'Seguro del carro',
-    categoryId: servicesCategoryId,
-    amount: 120000,
+    name: 'Seguro médico',
+    categoryId: saludId,
+    amount: 60000,
     currencyId: CRC_ID,
     periodicity: 'monthly',
     dueDayConfig: null,
@@ -181,7 +211,7 @@ async function main(): Promise<void> {
     monthlyDueDay: 28,
     fundingMode: 'installments',
     installmentFrequency: 'weekly',
-    responsibleMemberId: mariaMemberId,
+    responsibleMemberId: jordanMemberId,
     createdByMemberId: jordanMemberId,
   });
   await setInstallmentShares({
@@ -197,47 +227,110 @@ async function main(): Promise<void> {
   const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
   await generateInstallmentsForMonth({ recurringExpenseId: seguro.id, householdId: household.id, monthStart });
 
-  // --- Marcar la ocurrencia de Internet como pagada (este mes, para el dashboard) ---
-  // NOTE: la primera ocurrencia de un gasto se genera (y su snapshot de shares
-  // se toma) dentro de createRecurringExpense, ANTES de que existan shares
-  // configurados arriba — así que queda "sin compartir", igual que pasaría en
-  // la UI real (el reparto es edit-only). Para que el saldo entre miembros se
-  // vea poblado en la demo, insertamos el snapshot a mano para esta ocurrencia
-  // puntual, replicando exactamente lo que sp_expense_occurrence_shares_snapshot
-  // habría hecho si los shares ya hubieran existido a tiempo.
-  const [internetOccurrence] = await listOccurrences(internet.id, household.id);
-  await markOccurrencePaid({ occurrenceId: internetOccurrence.id, householdId: household.id, paidByMemberId: jordanMemberId });
+  const streaming = await createRecurringExpense({
+    householdId: household.id,
+    name: 'Streaming',
+    categoryId: entretenimientoId,
+    amount: 12000,
+    currencyId: CRC_ID,
+    periodicity: 'monthly',
+    dueDayConfig: null,
+    withdrawalDay: null,
+    firstDueDate: null,
+    monthlyDueDay: 8,
+    fundingMode: 'full_payment',
+    installmentFrequency: null,
+    responsibleMemberId: mariaMemberId,
+    createdByMemberId: jordanMemberId,
+  });
+  await setRecurringExpenseShares({
+    recurringExpenseId: streaming.id,
+    householdId: household.id,
+    shares: [{ memberId: jordanMemberId, percentage: 50 }, { memberId: mariaMemberId, percentage: 50 }],
+  });
+
+  // --- Cada gasto recurrente tiene un monto FIJO (vive en recurring_expenses,
+  // no hay columna de monto por ocurrencia) — así que "variar el monto por
+  // mes" no es posible sin tocar el esquema. La variación real en la
+  // evolución mensual sale de variar QUÉ gastos se pagaron cada mes, no cuánto.
+  //
+  // NOTE: la primera ocurrencia de cada gasto se genera (y su snapshot de
+  // shares se toma) dentro de createRecurringExpense, ANTES de configurar los
+  // shares arriba — queda "sin compartir", igual que en la UI real (el
+  // reparto es edit-only). Para los gastos MENSUALES además esa primera
+  // ocurrencia puede caer el mes que viene si "hoy" ya pasó el día de
+  // vencimiento configurado (mismo roll-forward que usa la app real) — nada
+  // útil para una demo con fechas controladas, así que se borra y se
+  // reemplaza por ocurrencias insertadas a mano con fechas exactas.
+  type ShareSplit = { memberId: number; percentage: number };
+  const alquilerShares: ShareSplit[] = [{ memberId: jordanMemberId, percentage: 60 }, { memberId: mariaMemberId, percentage: 40 }];
+  const fiftyFifty: ShareSplit[] = [{ memberId: jordanMemberId, percentage: 50 }, { memberId: mariaMemberId, percentage: 50 }];
+
+  const monthlyExpenseIds = [alquiler.id, electricidad.id, seguro.id, streaming.id];
+  await pool.query(`DELETE FROM expense_occurrences WHERE recurring_expense_id IN (${monthlyExpenseIds.map(() => '?').join(',')})`, monthlyExpenseIds);
+
+  async function insertOccurrence(
+    recurringExpenseId: number,
+    dateStr: string,
+    isPaid: boolean,
+    paidByMemberId: number | null,
+    shares: ShareSplit[] | null,
+    amount: number,
+  ): Promise<number> {
+    const [result] = await pool.query(
+      `INSERT INTO expense_occurrences (recurring_expense_id, period_start, period_end, due_date, is_paid, paid_by_member_id, paid_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [recurringExpenseId, dateStr, dateStr, dateStr, isPaid ? 1 : 0, paidByMemberId, isPaid ? `${dateStr} 10:00:00` : null],
+    );
+    const occurrenceId = (result as unknown as { insertId: number }).insertId;
+    if (shares) {
+      for (const share of shares) {
+        await pool.query(
+          'INSERT INTO expense_occurrence_shares (occurrence_id, member_id, percentage, amount_owed) VALUES (?, ?, ?, ?)',
+          [occurrenceId, share.memberId, share.percentage, Math.round((amount * share.percentage) / 100)],
+        );
+      }
+    }
+    return occurrenceId;
+  }
+
+  const today = new Date();
+  const thisMonthStr = (day: number) => new Date(today.getFullYear(), today.getMonth(), day).toISOString().slice(0, 10);
+
+  // Este mes: todo pagado salvo Alquiler (queda pendiente, para que /gastos
+  // también muestre algo por vencer) y una cuota de Seguro médico.
+  await insertOccurrence(alquiler.id, thisMonthStr(30), false, null, alquilerShares, 350000);
+  await insertOccurrence(electricidad.id, thisMonthStr(20), true, mariaMemberId, fiftyFifty, 45000);
+  await insertOccurrence(seguro.id, thisMonthStr(28), false, null, null, 60000);
+  await insertOccurrence(streaming.id, thisMonthStr(8), true, mariaMemberId, fiftyFifty, 12000);
+  const internetOccurrenceThisMonth = await listOccurrences(internet.id, household.id);
+  await markOccurrencePaid({ occurrenceId: internetOccurrenceThisMonth[0].id, householdId: household.id, paidByMemberId: jordanMemberId });
   await pool.query(
-    `INSERT INTO expense_occurrence_shares (occurrence_id, member_id, percentage, amount_owed) VALUES
-     (?, ?, 50, 7500), (?, ?, 50, 7500)`,
-    [internetOccurrence.id, jordanMemberId, internetOccurrence.id, mariaMemberId],
+    'INSERT INTO expense_occurrence_shares (occurrence_id, member_id, percentage, amount_owed) VALUES (?, ?, 50, 7500), (?, ?, 50, 7500)',
+    [internetOccurrenceThisMonth[0].id, jordanMemberId, internetOccurrenceThisMonth[0].id, mariaMemberId],
   );
 
-  // --- Historial de meses anteriores (inserción directa para la evolución mensual) ---
-  const today = new Date();
-  for (let monthsAgo = 1; monthsAgo <= 4; monthsAgo++) {
-    const historicDate = new Date(today.getFullYear(), today.getMonth() - monthsAgo, 15);
-    const dateStr = historicDate.toISOString().slice(0, 10);
+  // Meses anteriores: se varía cuáles de los 4 gastos mensuales aparecieron
+  // pagados cada mes (Streaming y Seguro no siempre), para que la curva de
+  // evolución mensual suba y baje en vez de ser una línea plana.
+  const monthlyHistory: Array<{ monthsAgo: number; expenses: number[] }> = [
+    { monthsAgo: 4, expenses: [alquiler.id, electricidad.id, seguro.id] },
+    { monthsAgo: 3, expenses: [alquiler.id, electricidad.id, seguro.id, streaming.id] },
+    { monthsAgo: 2, expenses: [alquiler.id, electricidad.id] },
+    { monthsAgo: 1, expenses: [alquiler.id, electricidad.id, seguro.id, streaming.id] },
+  ];
+  const amountById: Record<number, number> = { [alquiler.id]: 350000, [electricidad.id]: 45000, [seguro.id]: 60000, [streaming.id]: 12000 };
+  const sharesById: Record<number, ShareSplit[] | null> = { [alquiler.id]: alquilerShares, [electricidad.id]: fiftyFifty, [seguro.id]: null, [streaming.id]: fiftyFifty };
+  const payerById: Record<number, number> = { [alquiler.id]: jordanMemberId, [electricidad.id]: mariaMemberId, [seguro.id]: jordanMemberId, [streaming.id]: mariaMemberId };
 
-    const [alquilerResult] = await pool.query(
-      `INSERT INTO expense_occurrences (recurring_expense_id, period_start, period_end, due_date, is_paid, paid_by_member_id, paid_at)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`,
-      [alquiler.id, dateStr, dateStr, dateStr, jordanMemberId, `${dateStr} 10:00:00`],
-    );
-    const alquilerOccurrenceId = (alquilerResult as unknown as { insertId: number }).insertId;
-    // Alquiler es 60/40 Jordan/María y siempre lo paga Jordan — María le debe
-    // su 40% cada mes, así el dashboard muestra un saldo real entre miembros.
-    await pool.query(
-      `INSERT INTO expense_occurrence_shares (occurrence_id, member_id, percentage, amount_owed) VALUES
-       (?, ?, 60, 210000), (?, ?, 40, 140000)`,
-      [alquilerOccurrenceId, jordanMemberId, alquilerOccurrenceId, mariaMemberId],
-    );
-
-    await pool.query(
-      `INSERT INTO expense_occurrences (recurring_expense_id, period_start, period_end, due_date, is_paid, paid_by_member_id, paid_at)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`,
-      [seguro.id, dateStr, dateStr, dateStr, mariaMemberId, `${dateStr} 10:00:00`],
-    );
+  for (const month of monthlyHistory) {
+    const dateStr = new Date(today.getFullYear(), today.getMonth() - month.monthsAgo, 15).toISOString().slice(0, 10);
+    for (const expenseId of month.expenses) {
+      await insertOccurrence(expenseId, dateStr, true, payerById[expenseId], sharesById[expenseId], amountById[expenseId]);
+    }
+    // Internet (semanal) y Gasolina (quincenal) sí se pagaron todos los meses.
+    await insertOccurrence(internet.id, dateStr, true, jordanMemberId, fiftyFifty, 15000);
+    await insertOccurrence(gasolina.id, dateStr, true, mariaMemberId, null, 40000);
   }
 
   console.log('');
