@@ -1,6 +1,6 @@
 import type { PendingReminderRecord } from '@/lib/db/procedures/reminders';
 
-async function sendTelegramMessage(chatId: number, text: string): Promise<void> {
+export async function sendTelegramMessage(chatId: number, text: string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',

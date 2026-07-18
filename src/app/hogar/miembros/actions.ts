@@ -9,8 +9,7 @@ const inviteSchema = z.object({ email: z.string().email() });
 
 export interface InviteActionState {
   error: string | null;
-  success: boolean;
-  emailSent: boolean;
+  inviteUrl: string | null;
 }
 
 export async function inviteMemberAction(
@@ -19,26 +18,25 @@ export async function inviteMemberAction(
 ): Promise<InviteActionState> {
   const session = await auth();
   if (!session?.user?.id) {
-    return { error: 'Debés iniciar sesión', success: false, emailSent: false };
+    return { error: 'Debés iniciar sesión', inviteUrl: null };
   }
 
   const parsed = inviteSchema.safeParse({ email: formData.get('email') });
   if (!parsed.success) {
-    return { error: 'Correo inválido', success: false, emailSent: false };
+    return { error: 'Correo inválido', inviteUrl: null };
   }
 
   const [membership] = await getHouseholdsForUser(Number(session.user.id));
   if (!membership) {
-    return { error: 'No pertenecés a ningún hogar todavía', success: false, emailSent: false };
+    return { error: 'No pertenecés a ningún hogar todavía', inviteUrl: null };
   }
 
-  const { emailSent } = await inviteHouseholdMember({
+  const { inviteUrl } = await inviteHouseholdMember({
     householdId: membership.id,
-    householdName: membership.name,
     email: parsed.data.email,
     invitedByMemberId: membership.member_id,
     appUrl: process.env.APP_URL ?? 'http://localhost:3000',
   });
 
-  return { error: null, success: true, emailSent };
+  return { error: null, inviteUrl };
 }

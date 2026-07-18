@@ -1,12 +1,24 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { inviteMemberAction, type InviteActionState } from './actions';
 
-const initialState: InviteActionState = { error: null, success: false, emailSent: false };
+const initialState: InviteActionState = { error: null, inviteUrl: null };
 
 export default function HouseholdMembersPage() {
   const [state, formAction, pending] = useActionState(inviteMemberAction, initialState);
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy(url: string): void {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  const telegramShareUrl = state.inviteUrl
+    ? `https://t.me/share/url?url=${encodeURIComponent(state.inviteUrl)}&text=${encodeURIComponent('Te invité a FinanzHome, nuestro hogar en la app 🏠')}`
+    : null;
 
   return (
     <main className="container-fluid px-3 py-4 pb-bottom-nav" style={{ maxWidth: 420 }}>
@@ -21,17 +33,33 @@ export default function HouseholdMembersPage() {
             {state.error}
           </div>
         ) : null}
-        {state.success ? (
-          <div className="alert alert-success py-2 mb-0" role="alert">
-            {state.emailSent
-              ? 'Invitación enviada.'
-              : 'Invitación creada, pero no pudimos enviar el correo. Compartí el enlace manualmente.'}
-          </div>
-        ) : null}
         <button type="submit" className="btn btn-primary" disabled={pending}>
-          {pending ? 'Enviando…' : 'Enviar invitación'}
+          {pending ? 'Creando…' : 'Crear invitación'}
         </button>
       </form>
+
+      {state.inviteUrl ? (
+        <div className="card mt-4">
+          <div className="card-body">
+            <div className="fw-semibold mb-1">Invitación creada</div>
+            <p className="text-body-secondary small mb-3">
+              Compartila por Telegram con la persona que invitaste.
+            </p>
+            <a href={telegramShareUrl!} target="_blank" rel="noopener noreferrer" className="btn btn-primary w-100 mb-2">
+              <i className="bi bi-telegram me-1" />
+              Compartir por Telegram
+            </a>
+            <button
+              type="button"
+              className="btn btn-outline-secondary w-100"
+              onClick={() => handleCopy(state.inviteUrl!)}
+            >
+              <i className={`bi ${copied ? 'bi-check-lg' : 'bi-clipboard'} me-1`} />
+              {copied ? 'Copiado' : 'Copiar enlace'}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
