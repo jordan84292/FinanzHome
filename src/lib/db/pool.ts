@@ -30,18 +30,23 @@ function createPool(): mysql.Pool {
     dateStrings: true,
     // Sin esto, mysql2 serializa parámetros Date (ej. expiresAt en
     // createPasswordResetToken) usando la zona horaria LOCAL de la máquina que
-    // corre Node, no UTC. Si esa máquina y el servidor de MySQL/MariaDB no
-    // coinciden en zona horaria (ej. dev en Costa Rica UTC-6 contra Aiven en
+    // corre Node, no la del servidor. Si esa máquina y el servidor de
+    // MySQL/MariaDB no coinciden (ej. dev en Costa Rica UTC-6 contra Aiven en
     // UTC), el valor escrito queda desalineado con el NOW() del servidor —
     // se detectó como un token de reset "ya vencido" apenas creado al probar
-    // contra Aiven. 'Z' fuerza que el driver siempre trate los Date como UTC.
-    timezone: 'Z',
+    // contra Aiven. Se fija en Costa Rica (UTC-6, sin horario de verano) en
+    // vez de UTC porque el negocio (vencimientos, "hoy", límites de mes) es
+    // inherentemente el día calendario de Costa Rica, no el de UTC — probamos
+    // con UTC primero y expuso un bug real: CURDATE() en UTC ya es "mañana"
+    // para cualquier hora después de las 6pm hora de Costa Rica, lo que rompió
+    // la generación de ocurrencias semanales (día de la semana equivocado).
+    timezone: '-06:00',
   });
 
-  // La sesión del servidor también debe operar en UTC para que NOW()/CURDATE()
-  // concuerden con lo que el driver acaba de escribir en UTC (arriba).
+  // La sesión del servidor también debe fijarse en Costa Rica para que
+  // NOW()/CURDATE() concuerden con lo que el driver acaba de escribir arriba.
   pool.on('connection', (connection) => {
-    connection.query("SET time_zone = '+00:00'");
+    connection.query("SET time_zone = '-06:00'");
   });
 
   return pool;

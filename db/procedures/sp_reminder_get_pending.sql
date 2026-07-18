@@ -74,11 +74,13 @@ BEGIN
 
     IF v_payment_frequency = 'weekly' THEN
       -- WEEKDAY() returns 0=Monday..6=Sunday, matching payment_weekday's 1=Monday..7=Sunday
-      -- once shifted by -1; MOD(...,7) after adding 7 keeps the result in 0..6 even when
-      -- the raw difference is negative (same formula as occurrence generation).
+      -- once shifted by -1; the +7 is added BEFORE subtracting WEEKDAY (not after)
+      -- because both operands are UNSIGNED — a negative UNSIGNED intermediate errors
+      -- outright even though the final MOD(...,7) would have been correct (same fix
+      -- as sp_expense_occurrence_generate_next's identical formula).
       SET v_next_payment_date = DATE_ADD(
         v_due_date,
-        INTERVAL MOD((v_payment_weekday - 1) - WEEKDAY(v_due_date) + 7, 7) DAY
+        INTERVAL MOD((v_payment_weekday - 1) + 7 - WEEKDAY(v_due_date), 7) DAY
       );
     ELSEIF v_payment_frequency = 'monthly' THEN
       SET v_candidate = DATE_ADD(

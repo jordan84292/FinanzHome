@@ -58,11 +58,15 @@ BEGIN
 
       SET v_start_date = IFNULL(DATE_ADD(v_last_period_end, INTERVAL 1 DAY), CURDATE());
       -- WEEKDAY() returns 0=Monday..6=Sunday, matching due_day_config's 1=Monday..7=Sunday
-      -- once shifted by -1; MOD(...,7) after adding 7 keeps the result in 0..6 even when
-      -- the raw difference is negative.
+      -- once shifted by -1; the +7 is added BEFORE subtracting WEEKDAY (not after)
+      -- because both operands are UNSIGNED — MariaDB errors with "BIGINT UNSIGNED
+      -- value is out of range" on a negative UNSIGNED intermediate even though the
+      -- final MOD(...,7) result would have been correct; adding 7 first keeps every
+      -- intermediate step >= 0 (verified: due_day_config=5, WEEKDAY=5 underflowed
+      -- with the old ordering).
       SET v_due_date = DATE_ADD(
         v_start_date,
-        INTERVAL MOD((v_due_day_config - 1) - WEEKDAY(v_start_date) + 7, 7) DAY
+        INTERVAL MOD((v_due_day_config - 1) + 7 - WEEKDAY(v_start_date), 7) DAY
       );
 
       INSERT INTO expense_occurrences (recurring_expense_id, period_start, period_end, due_date)

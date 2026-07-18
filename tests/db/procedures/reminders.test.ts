@@ -201,6 +201,12 @@ describe('sp_reminder_get_pending — withdrawal', () => {
     const { householdId, memberId } = await createOwner(suffix);
     const [category] = await listExpenseCategories();
     const today = new Date();
+    const todayIso = isoDate(today);
+    // Derive withdrawalDay from the same ISO string passed as p_today, not from
+    // today.getDate() (local time) — toISOString() is always UTC, so the two
+    // can disagree on "what day is today" for hours each day (e.g. after 6pm
+    // in Costa Rica, UTC has already rolled to the next calendar day).
+    const withdrawalDay = Number(todayIso.slice(8, 10));
 
     await createRecurringExpense({
       householdId,
@@ -210,13 +216,13 @@ describe('sp_reminder_get_pending — withdrawal', () => {
       currencyId: CRC_ID,
       periodicity: 'biweekly',
       dueDayConfig: null,
-      withdrawalDay: today.getDate(),
+      withdrawalDay,
       firstDueDate: null,
       responsibleMemberId: memberId,
       createdByMemberId: memberId,
     });
 
-    const pending = await getPendingReminders(isoDate(today));
+    const pending = await getPendingReminders(todayIso);
 
     expect(pending.some((r) => r.reminder_type === 'withdrawal')).toBe(true);
   });
