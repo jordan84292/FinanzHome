@@ -9,6 +9,8 @@
     "lint": "eslint",
     "db:migrate": "tsx scripts/db/migrate.ts --database=finanzhome",
     "db:migrate:test": "tsx scripts/db/migrate.ts --database=finanzhome_test",
+    "db:wipe": "tsx scripts/db/wipe.ts --database=finanzhome --env=.env.local",
+    "db:seed": "tsx --env-file=.env.local scripts/db/seed.ts",
     "test": "vitest run"
   },
   "dependencies": {
