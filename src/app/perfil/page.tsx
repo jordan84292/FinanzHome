@@ -16,7 +16,7 @@ export default async function ProfilePage() {
   const profile = await getUserProfile(Number(session.user.id));
 
   return (
-    <main className="container-fluid px-3 py-4" style={{ maxWidth: 420 }}>
+    <main className="container-fluid px-3 py-4 pb-bottom-nav" style={{ maxWidth: 420 }}>
       <h1 className="h4 mb-1">Tu perfil</h1>
       <p className="text-body-secondary mb-4">{profile?.email}</p>
 

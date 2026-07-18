@@ -33,7 +33,7 @@ export function GastosClient({
   const visibleExpenses = expenses.filter((e) => (tab === 'active' ? e.is_active === 1 : e.is_active === 0));
 
   return (
-    <main className="container-fluid px-3 py-4">
+    <main className="container-fluid px-3 py-4 pb-bottom-nav">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h1 className="h4 mb-0">Gastos</h1>
         <button type="button" className="btn btn-primary btn-sm" onClick={() => setPanel({ mode: 'create' })}>

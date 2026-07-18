@@ -59,7 +59,7 @@ export function PagosPendientesClient({ payments }: { payments: ShoppingListPaym
   }, [payments]);
 
   return (
-    <main className="container-fluid px-3 py-4">
+    <main className="container-fluid px-3 py-4 pb-bottom-nav">
       <div className="d-flex align-items-center gap-2 mb-3">
         <Link href="/compras" className="btn btn-outline-secondary btn-sm">
           <i className="bi bi-arrow-left" />

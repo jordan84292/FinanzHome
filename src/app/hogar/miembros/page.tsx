@@ -9,7 +9,7 @@ export default function HouseholdMembersPage() {
   const [state, formAction, pending] = useActionState(inviteMemberAction, initialState);
 
   return (
-    <main className="container-fluid px-3 py-4" style={{ maxWidth: 420 }}>
+    <main className="container-fluid px-3 py-4 pb-bottom-nav" style={{ maxWidth: 420 }}>
       <h1 className="h4 mb-4">Invitar miembro</h1>
       <form action={formAction} className="d-flex flex-column gap-3">
         <div>

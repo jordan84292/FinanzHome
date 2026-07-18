@@ -28,6 +28,12 @@
 
   --gradient-accent: linear-gradient(135deg, #A855F7 0%, #EC4899 100%);
   --glow-accent: 0 0 20px rgba(168, 85, 247, 0.45);
+
+  /* Altura real medida de BottomNav (icono + label + paddings) — usada tanto
+     por el propio nav (para respetar el safe-area del home indicator en iOS)
+     como por .pb-bottom-nav (para que el último elemento de cada página
+     nunca quede tapado por el nav fijo). */
+  --bottom-nav-height: 64px;
 }
 
 body {
@@ -63,6 +69,12 @@ body {
   background: var(--gradient-accent);
   filter: brightness(1.08);
   box-shadow: var(--glow-accent);
+}
+
+/* Reserva de espacio para que el contenido nunca quede detrás de BottomNav
+   (fixed-bottom) — usar en el <main> de cada página que conviva con el nav. */
+.pb-bottom-nav {
+  padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 1.5rem) !important;
 }
 
 h1,

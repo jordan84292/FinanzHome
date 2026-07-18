@@ -123,7 +123,7 @@ export function DashboardClient({
   };
 
   return (
-    <main className="container-fluid px-3 py-4" style={{ paddingBottom: '5rem' }}>
+    <main className="container-fluid px-3 py-4 pb-bottom-nav">
       <h1 className="h4 mb-1">¡Hola, {firstName}! 👋</h1>
       <p className="text-body-secondary small mb-4">Este es el resumen financiero de tu hogar</p>
 

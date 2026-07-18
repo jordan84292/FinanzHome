@@ -15,7 +15,10 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="navbar fixed-bottom bg-body-tertiary border-top">
+    <nav
+      className="navbar fixed-bottom bg-body-tertiary border-top"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
       <div className="container-fluid d-flex justify-content-around py-1">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;

@@ -72,7 +72,7 @@ export function ShoppingListClient({
   const displayItems = offlineItems ?? items;
 
   return (
-    <main className="container-fluid px-3 py-4 pb-5">
+    <main className="container-fluid px-3 py-4 pb-bottom-nav">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h1 className="h4 mb-0">Lista de compras</h1>
         <div className="d-flex gap-2">
