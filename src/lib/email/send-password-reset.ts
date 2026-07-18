@@ -1,14 +1,23 @@
 import { resend } from './resend-client';
+import { renderEmailHtml, renderEmailButton } from './template';
 
 export async function sendPasswordResetEmail(params: {
   to: string;
   resetUrl: string;
 }): Promise<void> {
   const { error } = await resend.emails.send({
-    from: 'FinanzHome <onboarding@resend.dev>',
+    from: process.env.RESEND_FROM_EMAIL ?? 'FinanzHome <onboarding@resend.dev>',
     to: params.to,
     subject: 'Restablecé tu contraseña en FinanzHome',
-    html: `<p>Pediste restablecer tu contraseña en FinanzHome.</p><p><a href="${params.resetUrl}">Elegir nueva contraseña</a></p><p>Si no fuiste vos, ignorá este correo.</p>`,
+    html: renderEmailHtml({
+      heading: 'Restablecé tu contraseña',
+      bodyHtml: `
+        <p style="color: #A9A3C9; margin: 0 0 16px;">
+          Pediste restablecer tu contraseña en FinanzHome. Si no fuiste vos, ignorá este correo.
+        </p>
+        ${renderEmailButton(params.resetUrl, 'Elegir nueva contraseña')}
+      `,
+    }),
   });
 
   if (error) {

@@ -1,4 +1,5 @@
 import { resend } from './resend-client';
+import { renderEmailHtml, renderEmailButton } from './template';
 
 export async function sendInvitationEmail(params: {
   to: string;
@@ -6,10 +7,16 @@ export async function sendInvitationEmail(params: {
   inviteUrl: string;
 }): Promise<void> {
   const { error } = await resend.emails.send({
-    from: 'FinanzHome <onboarding@resend.dev>',
+    from: process.env.RESEND_FROM_EMAIL ?? 'FinanzHome <onboarding@resend.dev>',
     to: params.to,
     subject: `Te invitaron a ${params.householdName} en FinanzHome`,
-    html: `<p>Te invitaron a unirte a <strong>${params.householdName}</strong> en FinanzHome.</p><p><a href="${params.inviteUrl}">Aceptar invitación</a></p>`,
+    html: renderEmailHtml({
+      heading: `Te invitaron a ${params.householdName}`,
+      bodyHtml: `
+        <p style="color: #A9A3C9; margin: 0 0 16px;">Sumate para llevar juntos las finanzas del hogar.</p>
+        ${renderEmailButton(params.inviteUrl, 'Aceptar invitación')}
+      `,
+    }),
   });
 
   if (error) {
