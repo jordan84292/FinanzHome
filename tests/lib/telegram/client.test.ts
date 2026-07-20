@@ -22,6 +22,13 @@ function makeReminder(overrides: Partial<ReminderFields>): PendingReminderRecord
 }
 
 describe('buildReminderMessage', () => {
+  it('builds a due_week message mentioning the expense name, amount, and due date', () => {
+    const message = buildReminderMessage(makeReminder({ reminder_type: 'due_week' }));
+    expect(message).toContain('Alquiler');
+    expect(message).toContain('una semana');
+    expect(message).toContain('2026-07-20');
+  });
+
   it('builds a due_soon message mentioning the expense name, amount, and due date', () => {
     const message = buildReminderMessage(makeReminder({ reminder_type: 'due_soon' }));
     expect(message).toContain('Alquiler');

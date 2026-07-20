@@ -17,9 +17,10 @@ export async function sendTelegramMessage(chatId: number, text: string): Promise
 export function buildReminderMessage(reminder: PendingReminderRecord): string {
   const amount = `${reminder.currency_symbol}${reminder.amount}`;
   const templates: Record<PendingReminderRecord['reminder_type'], string> = {
+    due_week: `Recordatorio: "${reminder.expense_name}" (${amount}) vence en una semana, el ${reminder.due_date}.`,
     due_soon: `Recordatorio: "${reminder.expense_name}" (${amount}) vence mañana ${reminder.due_date}.`,
     due_today: `Hoy vence "${reminder.expense_name}" (${amount}). No lo dejés pasar.`,
-    overdue_daily: `"${reminder.expense_name}" (${amount}) está vencido desde el ${reminder.due_date}. Ya te tocó pago, ponete al día.`,
+    overdue_daily: `"${reminder.expense_name}" (${amount}) está vencido desde el ${reminder.due_date}. Ponete al día.`,
     withdrawal: `Hoy es día de retirar fondos para "${reminder.expense_name}" (${amount}).`,
   };
   return templates[reminder.reminder_type];
