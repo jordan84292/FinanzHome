@@ -93,6 +93,68 @@ describe('sp_reminder_get_pending — due_soon', () => {
   });
 });
 
+describe('sp_reminder_get_pending — due_today', () => {
+  it('flags a one_time expense due today as due_today', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const [category] = await listExpenseCategories();
+    const today = new Date();
+
+    await createRecurringExpense({
+      householdId,
+      name: `Vence hoy ${suffix}`,
+      categoryId: category.id,
+      amount: 5000,
+      currencyId: CRC_ID,
+      periodicity: 'one_time',
+      dueDayConfig: null,
+      withdrawalDay: null,
+      firstDueDate: isoDate(today),
+      responsibleMemberId: memberId,
+      createdByMemberId: memberId,
+    });
+
+    const pending = await getPendingReminders(isoDate(today));
+
+    const match = pending.find((r) => r.reminder_type === 'due_today' && r.expense_name === `Vence hoy ${suffix}`);
+    expect(match).toBeDefined();
+    expect(match?.member_id).toBe(memberId);
+  });
+
+  it('does not re-flag due_today once it has already been logged sent today', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const [category] = await listExpenseCategories();
+    const today = new Date();
+
+    const expense = await createRecurringExpense({
+      householdId,
+      name: `Ya avisado hoy ${suffix}`,
+      categoryId: category.id,
+      amount: 5000,
+      currencyId: CRC_ID,
+      periodicity: 'one_time',
+      dueDayConfig: null,
+      withdrawalDay: null,
+      firstDueDate: isoDate(today),
+      responsibleMemberId: memberId,
+      createdByMemberId: memberId,
+    });
+    const [occurrence] = await listOccurrences(expense.id, householdId);
+
+    await logReminderSent({
+      occurrenceId: occurrence.id,
+      memberId,
+      reminderType: 'due_today',
+      sentDate: isoDate(today),
+    });
+
+    const pending = await getPendingReminders(isoDate(today));
+
+    expect(pending.some((r) => r.occurrence_id === occurrence.id && r.reminder_type === 'due_today')).toBe(false);
+  });
+});
+
 describe('sp_reminder_get_pending — overdue_daily (payment-frequency math)', () => {
   it('flags overdue for a weekly-paid member once today reaches their payday on/after due_date', async () => {
     const suffix = uniqueSuffix();

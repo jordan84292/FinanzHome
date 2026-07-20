@@ -1,7 +1,7 @@
 import type { RowDataPacket } from 'mysql2';
 import { callProcedure } from '../call';
 
-export type ReminderType = 'due_soon' | 'overdue_daily' | 'withdrawal';
+export type ReminderType = 'due_soon' | 'due_today' | 'overdue_daily' | 'withdrawal';
 
 export interface PendingReminderRecord extends RowDataPacket {
   reminder_type: ReminderType;

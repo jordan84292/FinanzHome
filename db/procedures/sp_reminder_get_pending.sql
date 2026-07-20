@@ -44,7 +44,7 @@ BEGIN
     occurrence_id INT UNSIGNED NOT NULL,
     recurring_expense_id INT UNSIGNED NOT NULL,
     member_id INT UNSIGNED NOT NULL,
-    reminder_type ENUM('due_soon', 'overdue_daily', 'withdrawal') NOT NULL
+    reminder_type ENUM('due_soon', 'due_today', 'overdue_daily', 'withdrawal') NOT NULL
   );
 
   -- due_soon: unpaid occurrence due tomorrow, not already logged today
@@ -59,6 +59,25 @@ BEGIN
       SELECT 1 FROM reminder_log rl
       WHERE rl.occurrence_id = eo.id AND rl.member_id = re.responsible_member_id
         AND rl.reminder_type = 'due_soon' AND rl.sent_date = p_today
+    );
+
+  -- due_today: unpaid occurrence due today, not already logged today. Fills
+  -- the real gap due_soon/overdue_daily leave open — an expense created the
+  -- same day it's due (or simply never caught by yesterday's due_soon check,
+  -- e.g. the household wasn't using the app yet) never lands in either of
+  -- those: due_soon only fires the day before, overdue_daily only after
+  -- due_date has passed.
+  INSERT INTO tmp_pending_reminders (occurrence_id, recurring_expense_id, member_id, reminder_type)
+  SELECT eo.id, eo.recurring_expense_id, re.responsible_member_id, 'due_today'
+  FROM expense_occurrences eo
+  INNER JOIN recurring_expenses re ON re.id = eo.recurring_expense_id
+  WHERE eo.due_date = p_today
+    AND eo.is_paid = 0
+    AND re.is_active = 1
+    AND NOT EXISTS (
+      SELECT 1 FROM reminder_log rl
+      WHERE rl.occurrence_id = eo.id AND rl.member_id = re.responsible_member_id
+        AND rl.reminder_type = 'due_today' AND rl.sent_date = p_today
     );
 
   -- overdue_daily: for each overdue+unpaid occurrence whose responsible member has a

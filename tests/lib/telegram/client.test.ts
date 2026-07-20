@@ -29,6 +29,12 @@ describe('buildReminderMessage', () => {
     expect(message).toContain('2026-07-20');
   });
 
+  it('builds a due_today message mentioning the expense name and amount', () => {
+    const message = buildReminderMessage(makeReminder({ reminder_type: 'due_today' }));
+    expect(message).toContain('Hoy');
+    expect(message).toContain('Alquiler');
+  });
+
   it('builds an overdue_daily message that reads as a nag, not a due-soon notice', () => {
     const message = buildReminderMessage(makeReminder({ reminder_type: 'overdue_daily' }));
     expect(message).toContain('vencido');
