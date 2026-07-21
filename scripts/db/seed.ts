@@ -87,6 +87,10 @@ async function main(): Promise<void> {
   // --- Compras: una lista ya confirmada y pagada a medias ---------------------
   const openList = await generateOrGetShoppingList(household.id, jordanMemberId);
   const items = await getShoppingListItems(openList.id, household.id, CRC_ID);
+  const openListActualTotal = items.reduce(
+    (sum, item) => sum + item.quantity_needed * (item.unit_price ?? 0),
+    0,
+  );
   await confirmShoppingList({
     shoppingListId: openList.id,
     householdId: household.id,
@@ -98,6 +102,7 @@ async function main(): Promise<void> {
     })),
     displayCurrencyId: CRC_ID,
     isShared: true,
+    actualTotal: openListActualTotal,
   });
   const splits = await initSplit(openList.id, household.id);
   const jordanSplit = splits.find((s) => s.member_id === jordanMemberId)!;

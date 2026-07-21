@@ -38,7 +38,7 @@ BEGIN
     FROM household_members
     WHERE household_id = p_household_id;
 
-    SELECT total_estimated INTO v_total
+    SELECT total_actual INTO v_total
     FROM shopping_lists
     WHERE id = p_shopping_list_id;
 

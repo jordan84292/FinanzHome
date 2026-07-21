@@ -124,8 +124,14 @@ export interface ConfirmPurchaseState {
 export async function confirmPurchaseAction(
   shoppingListId: number,
   isShared: boolean,
+  actualTotal: number,
 ): Promise<ConfirmPurchaseState> {
   const membership = await requireMembership();
+
+  const parsedTotal = z.coerce.number().min(0, 'El monto gastado no puede ser negativo').safeParse(actualTotal);
+  if (!parsedTotal.success) {
+    return { error: parsedTotal.error.issues[0]?.message ?? 'Ingresá el monto gastado' };
+  }
 
   const items = await getShoppingListItems(shoppingListId, membership.id, DISPLAY_CURRENCY_ID);
   if (items.length === 0) {
@@ -144,6 +150,7 @@ export async function confirmPurchaseAction(
       })),
       displayCurrencyId: DISPLAY_CURRENCY_ID,
       isShared,
+      actualTotal: parsedTotal.data,
     });
   } catch {
     return { error: 'No se pudo confirmar la compra. Intentá de nuevo.' };

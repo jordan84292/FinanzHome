@@ -143,6 +143,8 @@ export function ShoppingListClient({
             </div>
             <ConfirmPurchaseButton
               shoppingListId={displayList.id}
+              estimatedTotal={displayList.total_estimated_live ?? 0}
+              currencySymbol={displayCurrencySymbol}
               disabled={!isOnline}
               onConfirmed={(id, isShared) => {
                 if (isShared) setConfirmedListId(id);

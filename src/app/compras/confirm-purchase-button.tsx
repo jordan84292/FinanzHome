@@ -7,21 +7,38 @@ import { showError, showSuccess } from '@/lib/ui/alerts';
 
 export function ConfirmPurchaseButton({
   shoppingListId,
+  estimatedTotal,
+  currencySymbol,
   disabled = false,
   onConfirmed,
 }: {
   shoppingListId: number;
+  estimatedTotal: number;
+  currencySymbol: string;
   disabled?: boolean;
   onConfirmed: (shoppingListId: number, isShared: boolean) => void;
 }) {
   const [isPending, startTransition] = useTransition();
-  const [showChoice, setShowChoice] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [isShared, setIsShared] = useState(true);
+  const [actualTotal, setActualTotal] = useState('');
   const router = useRouter();
 
-  function handleChoose(isShared: boolean): void {
-    setShowChoice(false);
+  function handleOpen(): void {
+    setActualTotal(estimatedTotal.toString());
+    setIsShared(true);
+    setShowModal(true);
+  }
+
+  function handleConfirm(): void {
+    const parsedTotal = Number(actualTotal);
+    if (!actualTotal || Number.isNaN(parsedTotal) || parsedTotal < 0) {
+      showError('Ingresá el monto gastado.');
+      return;
+    }
+    setShowModal(false);
     startTransition(() => {
-      confirmPurchaseAction(shoppingListId, isShared)
+      confirmPurchaseAction(shoppingListId, isShared, parsedTotal)
         .then((result) => {
           if (result.error) {
             showError(result.error);
@@ -41,44 +58,64 @@ export function ConfirmPurchaseButton({
 
   return (
     <>
-      <button
-        type="button"
-        className="btn btn-primary"
-        disabled={disabled || isPending}
-        onClick={() => setShowChoice(true)}
-      >
+      <button type="button" className="btn btn-primary" disabled={disabled || isPending} onClick={handleOpen}>
         {isPending ? 'Confirmando…' : 'Confirmar compra'}
       </button>
 
-      {showChoice ? (
+      {showModal ? (
         <div
           className="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex align-items-end"
           style={{ zIndex: 1070 }}
         >
           <div className="bg-body w-100 p-3 rounded-top-4">
-            <h2 className="h6 mb-3">¿Esta compra se divide entre miembros del hogar?</h2>
-            <div className="d-flex flex-column gap-2">
+            <h2 className="h6 mb-3">Confirmar compra</h2>
+
+            <label className="form-label small text-body-secondary" htmlFor="actual-total-input">
+              Monto total gastado (el estimado era {currencySymbol}
+              {estimatedTotal}, es solo de referencia)
+            </label>
+            <div className="input-group mb-3">
+              <span className="input-group-text">{currencySymbol}</span>
+              <input
+                id="actual-total-input"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min={0}
+                className="form-control"
+                value={actualTotal}
+                onChange={(e) => setActualTotal(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="mb-1 small text-body-secondary">¿Esta compra se divide entre miembros del hogar?</div>
+            <div className="d-flex gap-2 mb-3">
               <button
                 type="button"
-                className="btn btn-primary"
-                disabled={isPending}
-                onClick={() => handleChoose(true)}
+                className={`btn flex-grow-1 ${isShared ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => setIsShared(true)}
               >
                 Compartida
               </button>
               <button
                 type="button"
-                className="btn btn-outline-primary"
-                disabled={isPending}
-                onClick={() => handleChoose(false)}
+                className={`btn flex-grow-1 ${!isShared ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => setIsShared(false)}
               >
                 Solo mía
               </button>
+            </div>
+
+            <div className="d-flex gap-2">
+              <button type="button" className="btn btn-primary flex-grow-1" disabled={isPending} onClick={handleConfirm}>
+                Confirmar compra
+              </button>
               <button
                 type="button"
-                className="btn btn-outline-secondary btn-sm"
+                className="btn btn-outline-secondary"
                 disabled={isPending}
-                onClick={() => setShowChoice(false)}
+                onClick={() => setShowModal(false)}
               >
                 Cancelar
               </button>

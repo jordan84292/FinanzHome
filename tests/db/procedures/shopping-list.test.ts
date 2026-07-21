@@ -293,10 +293,12 @@ describe('shopping list confirm procedure', () => {
       })),
       displayCurrencyId: CRC_ID,
       isShared: true,
+      actualTotal: 3200,
     });
 
     expect(confirmed.status).toBe('confirmed');
     expect(confirmed.total_estimated).toBe(3000);
+    expect(confirmed.total_actual).toBe(3200);
     expect(confirmed.total_estimated_currency_id).toBe(CRC_ID);
 
     const updatedItems = await getShoppingListItems(list.id, householdId, CRC_ID);
@@ -340,6 +342,7 @@ describe('shopping list confirm procedure', () => {
         })),
         displayCurrencyId: CRC_ID,
         isShared: true,
+        actualTotal: 0,
       }),
     ).rejects.toThrow(/not found/i);
   });
@@ -375,6 +378,7 @@ describe('shopping list confirm procedure', () => {
       items: payload,
       displayCurrencyId: CRC_ID,
       isShared: true,
+      actualTotal: 0,
     });
 
     await expect(
@@ -384,7 +388,44 @@ describe('shopping list confirm procedure', () => {
         items: payload,
         displayCurrencyId: CRC_ID,
         isShared: true,
+        actualTotal: 0,
       }),
     ).rejects.toThrow(/not found or already confirmed/i);
+  });
+
+  it('rejects a negative actual total', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const [category] = await listCategories();
+    const [unit] = await listUnits();
+    await createProduct({
+      householdId,
+      name: `Cafe ${suffix}`,
+      categoryId: category.id,
+      unitId: unit.id,
+      optimalQuantity: 1,
+      currentQuantity: 0,
+      defaultPrice: null,
+      defaultPriceCurrencyId: null,
+      createdByMemberId: memberId,
+    });
+    const list = await generateOrGetShoppingList(householdId, memberId);
+    const items = await getShoppingListItems(list.id, householdId, CRC_ID);
+
+    await expect(
+      confirmShoppingList({
+        shoppingListId: list.id,
+        householdId,
+        items: items.map((item) => ({
+          itemId: item.id,
+          quantity: item.quantity_needed,
+          unitPrice: item.unit_price,
+          unitPriceCurrencyId: item.unit_price_currency_id,
+        })),
+        displayCurrencyId: CRC_ID,
+        isShared: true,
+        actualTotal: -100,
+      }),
+    ).rejects.toThrow(/actual total spent is required/i);
   });
 });

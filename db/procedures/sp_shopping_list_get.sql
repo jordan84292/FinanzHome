@@ -25,7 +25,7 @@ BEGIN
 
   SELECT
     sl.id, sl.household_id, sl.status, sl.is_shared, sl.created_by_member_id,
-    sl.total_estimated, sl.total_estimated_currency_id, sl.created_at, sl.confirmed_at,
+    sl.total_estimated, sl.total_actual, sl.total_estimated_currency_id, sl.created_at, sl.confirmed_at,
     (
       SELECT ROUND(SUM(
         sli.quantity_needed * IFNULL(sli.unit_price, 0) *

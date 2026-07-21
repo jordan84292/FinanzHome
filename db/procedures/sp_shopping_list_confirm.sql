@@ -5,7 +5,8 @@ CREATE PROCEDURE sp_shopping_list_confirm(
   IN p_household_id INT UNSIGNED,
   IN p_items_json JSON,
   IN p_display_currency_id TINYINT UNSIGNED,
-  IN p_is_shared TINYINT(1)
+  IN p_is_shared TINYINT(1),
+  IN p_actual_total DECIMAL(12,2)
 )
 BEGIN
   DECLARE v_exists INT;
@@ -26,6 +27,10 @@ BEGIN
 
   IF v_exists = 0 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Shopping list not found or already confirmed';
+  END IF;
+
+  IF p_actual_total IS NULL OR p_actual_total < 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Actual total spent is required and must not be negative';
   END IF;
 
   SELECT rate_crc_per_usd INTO v_rate
@@ -93,11 +98,12 @@ BEGIN
   SET status = 'confirmed',
       is_shared = p_is_shared,
       total_estimated = v_total,
+      total_actual = p_actual_total,
       total_estimated_currency_id = p_display_currency_id,
       confirmed_at = NOW()
   WHERE id = p_shopping_list_id;
 
-  SELECT id, household_id, status, is_shared, created_by_member_id, total_estimated, total_estimated_currency_id, created_at, confirmed_at
+  SELECT id, household_id, status, is_shared, created_by_member_id, total_estimated, total_actual, total_estimated_currency_id, created_at, confirmed_at
   FROM shopping_lists
   WHERE id = p_shopping_list_id;
 END;

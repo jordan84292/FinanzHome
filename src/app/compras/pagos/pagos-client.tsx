@@ -82,7 +82,7 @@ export function PagosPendientesClient({ payments }: { payments: ShoppingListPaym
                       <div className="fw-semibold">{formatDate(first.confirmed_at)}</div>
                       <div className="text-body-secondary small">
                         Total: {first.currency_symbol}
-                        {first.total_estimated}
+                        {first.total_actual}
                       </div>
                     </div>
                     {allPaid ? <span className="badge text-bg-success">Todos pagaron</span> : null}

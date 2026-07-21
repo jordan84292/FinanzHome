@@ -27,7 +27,7 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Split percentages must sum to 100';
   END IF;
 
-  SELECT total_estimated INTO v_total
+  SELECT total_actual INTO v_total
   FROM shopping_lists
   WHERE id = p_shopping_list_id;
 

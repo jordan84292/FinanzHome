@@ -90,6 +90,7 @@ async function confirmAListWithDeficit(params: {
   currentQuantity: number;
   defaultPrice: number;
   isShared?: boolean;
+  actualTotal?: number;
 }): Promise<{ shoppingListId: number }> {
   const [category] = await listCategories();
   const [unit] = await listUnits();
@@ -106,6 +107,7 @@ async function confirmAListWithDeficit(params: {
   });
   const list = await generateOrGetShoppingList(params.householdId, params.memberId);
   const items = await getShoppingListItems(list.id, params.householdId, CRC_ID);
+  const estimatedTotal = items.reduce((sum, item) => sum + item.quantity_needed * (item.unit_price ?? 0), 0);
   await confirmShoppingList({
     shoppingListId: list.id,
     householdId: params.householdId,
@@ -117,6 +119,7 @@ async function confirmAListWithDeficit(params: {
     })),
     displayCurrencyId: CRC_ID,
     isShared: params.isShared ?? true,
+    actualTotal: params.actualTotal ?? estimatedTotal,
   });
   return { shoppingListId: list.id };
 }
@@ -144,6 +147,28 @@ describe('sp_shopping_list_split_init', () => {
     expect(totalOwed).toBe(10000);
   });
 
+  it('splits against the actual total entered at confirm time, not the estimated total', async () => {
+    // 10 units at 1000 estimates to 10000, but the user typed in what they
+    // actually paid at checkout — that figure is what must get split.
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    await addSecondMember({ householdId, invitedByMemberId: memberId, suffix });
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId,
+      memberId,
+      suffix,
+      optimalQuantity: 10,
+      currentQuantity: 0,
+      defaultPrice: 1000,
+      actualTotal: 12345,
+    });
+
+    const splits = await initSplit(shoppingListId, householdId);
+
+    const totalOwed = splits.reduce((sum, s) => sum + s.amount_owed, 0);
+    expect(totalOwed).toBe(12345);
+  });
+
   it('splits a three-member household with percentages summing to exactly 100', async () => {
     const suffix = uniqueSuffix();
     const { householdId, memberId } = await createMember(suffix);
@@ -168,11 +193,12 @@ describe('sp_shopping_list_split_init', () => {
     expect(splits[2].percentage).toBe(33.33);
   });
 
-  it('reconciles amount_owed to sum exactly to total_estimated when the equal split leaves a residual cent', async () => {
+  it('reconciles amount_owed to sum exactly to total_actual when the equal split leaves a residual cent', async () => {
     const suffix = uniqueSuffix();
     const { householdId, memberId } = await createThreeMemberHousehold(suffix);
-    // 10 units at 1.00 CRC each => total_estimated = 10.00, split 33.34/33.33/33.33
-    // independently rounds to 3.33/3.33/3.33 = 9.99, a cent short of 10.00.
+    // 10 units at 1.00 CRC each => total_actual defaults to 10.00 (the helper's
+    // estimated-total fallback), split 33.34/33.33/33.33 independently rounds
+    // to 3.33/3.33/3.33 = 9.99, a cent short of 10.00.
     const { shoppingListId } = await confirmAListWithDeficit({
       householdId,
       memberId,

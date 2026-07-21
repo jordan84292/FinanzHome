@@ -8,6 +8,12 @@ export interface ShoppingListRecord extends RowDataPacket {
   is_shared: number;
   created_by_member_id: number;
   total_estimated: number | null;
+  /**
+   * The amount the user actually entered at confirm time — this, not
+   * total_estimated, is what splits are computed against. total_estimated
+   * stays as the pre-purchase reference (sum of item qty * unit price).
+   */
+  total_actual: number | null;
   total_estimated_currency_id: number | null;
   created_at: string;
   confirmed_at: string | null;
@@ -132,6 +138,7 @@ export async function confirmShoppingList(params: {
   }>;
   displayCurrencyId: number;
   isShared: boolean;
+  actualTotal: number;
 }): Promise<ShoppingListRecord> {
   const rows = await callProcedure<ShoppingListRecord>('sp_shopping_list_confirm', [
     params.shoppingListId,
@@ -139,6 +146,7 @@ export async function confirmShoppingList(params: {
     JSON.stringify(params.items),
     params.displayCurrencyId,
     params.isShared ? 1 : 0,
+    params.actualTotal,
   ]);
   return rows[0];
 }

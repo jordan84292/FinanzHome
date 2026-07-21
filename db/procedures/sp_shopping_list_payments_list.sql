@@ -5,7 +5,7 @@ CREATE PROCEDURE sp_shopping_list_payments_list(
 )
 BEGIN
   SELECT
-    sl.id AS shopping_list_id, sl.confirmed_at, sl.total_estimated,
+    sl.id AS shopping_list_id, sl.confirmed_at, sl.total_actual,
     sl.total_estimated_currency_id, c.symbol AS currency_symbol,
     sls.id AS split_id, sls.member_id, hm.display_name,
     sls.percentage, sls.amount_owed, sls.is_paid, sls.paid_at

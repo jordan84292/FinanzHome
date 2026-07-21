@@ -16,7 +16,7 @@ export interface ShoppingListSplitRecord extends RowDataPacket {
 export interface ShoppingListPaymentRecord extends RowDataPacket {
   shopping_list_id: number;
   confirmed_at: string;
-  total_estimated: number;
+  total_actual: number;
   total_estimated_currency_id: number;
   currency_symbol: string;
   split_id: number;
