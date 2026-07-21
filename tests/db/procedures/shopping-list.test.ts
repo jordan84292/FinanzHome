@@ -292,6 +292,7 @@ describe('shopping list confirm procedure', () => {
         unitPriceCurrencyId: item.unit_price_currency_id,
       })),
       displayCurrencyId: CRC_ID,
+      isShared: true,
     });
 
     expect(confirmed.status).toBe('confirmed');
@@ -338,6 +339,7 @@ describe('shopping list confirm procedure', () => {
           unitPriceCurrencyId: item.unit_price_currency_id,
         })),
         displayCurrencyId: CRC_ID,
+        isShared: true,
       }),
     ).rejects.toThrow(/not found/i);
   });
@@ -367,10 +369,22 @@ describe('shopping list confirm procedure', () => {
       unitPriceCurrencyId: item.unit_price_currency_id,
     }));
 
-    await confirmShoppingList({ shoppingListId: list.id, householdId, items: payload, displayCurrencyId: CRC_ID });
+    await confirmShoppingList({
+      shoppingListId: list.id,
+      householdId,
+      items: payload,
+      displayCurrencyId: CRC_ID,
+      isShared: true,
+    });
 
     await expect(
-      confirmShoppingList({ shoppingListId: list.id, householdId, items: payload, displayCurrencyId: CRC_ID }),
+      confirmShoppingList({
+        shoppingListId: list.id,
+        householdId,
+        items: payload,
+        displayCurrencyId: CRC_ID,
+        isShared: true,
+      }),
     ).rejects.toThrow(/not found or already confirmed/i);
   });
 });

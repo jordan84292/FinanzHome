@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { registerUser } from '@/lib/db/procedures/auth';
-import { createHousehold, getHouseholdsForUser } from '@/lib/db/procedures/household';
+import {
+  acceptInvitation,
+  createHousehold,
+  createInvitation,
+  getHouseholdsForUser,
+} from '@/lib/db/procedures/household';
 import { createRecurringExpense, listExpenseCategories, listOccurrences } from '@/lib/db/procedures/recurring-expenses';
+import { setRecurringExpenseShares } from '@/lib/db/procedures/expense-shares';
 import { getPendingReminders, logReminderSent } from '@/lib/db/procedures/reminders';
 import { uniqueSuffix } from '../../helpers/db';
 
@@ -20,6 +26,27 @@ async function createOwner(suffix: string): Promise<{ householdId: number; membe
   });
   const [membership] = await getHouseholdsForUser(user.id);
   return { householdId: household.id, memberId: membership.member_id, userId: user.id };
+}
+
+async function addSecondMember(params: {
+  householdId: number;
+  invitedByMemberId: number;
+  suffix: string;
+}): Promise<{ memberId: number }> {
+  const secondUser = await registerUser({
+    email: `reminders_second_${params.suffix}@example.com`,
+    passwordHash: 'hash',
+    name: 'Second',
+  });
+  const invitation = await createInvitation({
+    householdId: params.householdId,
+    email: secondUser.email,
+    token: `reminders-token-${params.suffix}`,
+    invitedByMemberId: params.invitedByMemberId,
+    expiresAt: new Date(Date.now() + 86_400_000),
+  });
+  const member = await acceptInvitation({ token: invitation.token, userId: secondUser.id, displayName: 'Second' });
+  return { memberId: member.id };
 }
 
 function isoDate(date: Date): string {
@@ -211,6 +238,105 @@ describe('sp_reminder_get_pending — due_today', () => {
     const pending = await getPendingReminders(isoDate(today));
 
     expect(pending.some((r) => r.occurrence_id === occurrence.id && r.reminder_type === 'due_today')).toBe(false);
+  });
+});
+
+describe('sp_reminder_get_pending — shared one_time expenses are excluded', () => {
+  it('does not flag a shared one_time expense as due_today, even though it is due today and unpaid', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({ householdId, invitedByMemberId: memberId, suffix });
+    const [category] = await listExpenseCategories();
+    const today = new Date();
+
+    const expense = await createRecurringExpense({
+      householdId,
+      name: `Compartido vence hoy ${suffix}`,
+      categoryId: category.id,
+      amount: 6000,
+      currencyId: CRC_ID,
+      periodicity: 'one_time',
+      dueDayConfig: null,
+      withdrawalDay: null,
+      firstDueDate: isoDate(today),
+      responsibleMemberId: memberId,
+      createdByMemberId: memberId,
+    });
+    await setRecurringExpenseShares({
+      recurringExpenseId: expense.id,
+      householdId,
+      shares: [
+        { memberId, percentage: 50 },
+        { memberId: secondMemberId, percentage: 50 },
+      ],
+    });
+
+    const pending = await getPendingReminders(isoDate(today));
+
+    expect(pending.some((r) => r.recurring_expense_id === expense.id)).toBe(false);
+  });
+
+  it('does not flag a shared one_time expense as overdue_daily, even long past its due date', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({ householdId, invitedByMemberId: memberId, suffix });
+    const [category] = await listExpenseCategories();
+    const today = new Date();
+    const lastMonth = new Date(today);
+    lastMonth.setDate(lastMonth.getDate() - 30);
+
+    const expense = await createRecurringExpense({
+      householdId,
+      name: `Compartido vencido ${suffix}`,
+      categoryId: category.id,
+      amount: 6000,
+      currencyId: CRC_ID,
+      periodicity: 'one_time',
+      dueDayConfig: null,
+      withdrawalDay: null,
+      firstDueDate: isoDate(lastMonth),
+      responsibleMemberId: memberId,
+      createdByMemberId: memberId,
+    });
+    await setRecurringExpenseShares({
+      recurringExpenseId: expense.id,
+      householdId,
+      shares: [
+        { memberId, percentage: 50 },
+        { memberId: secondMemberId, percentage: 50 },
+      ],
+    });
+
+    const pending = await getPendingReminders(isoDate(today));
+
+    expect(pending.some((r) => r.recurring_expense_id === expense.id)).toBe(false);
+  });
+
+  it('still flags a NOT-shared one_time expense normally (no recurring_expense_shares rows)', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const [category] = await listExpenseCategories();
+    const today = new Date();
+
+    const expense = await createRecurringExpense({
+      householdId,
+      name: `Solo mio vence hoy ${suffix}`,
+      categoryId: category.id,
+      amount: 6000,
+      currencyId: CRC_ID,
+      periodicity: 'one_time',
+      dueDayConfig: null,
+      withdrawalDay: null,
+      firstDueDate: isoDate(today),
+      responsibleMemberId: memberId,
+      createdByMemberId: memberId,
+    });
+
+    const pending = await getPendingReminders(isoDate(today));
+
+    expect(
+      pending.some((r) => r.recurring_expense_id === expense.id && r.reminder_type === 'due_today'),
+    ).toBe(true);
   });
 });
 

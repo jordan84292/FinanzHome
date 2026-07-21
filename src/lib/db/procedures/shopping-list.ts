@@ -5,6 +5,7 @@ export interface ShoppingListRecord extends RowDataPacket {
   id: number;
   household_id: number;
   status: 'open' | 'confirmed' | 'cancelled';
+  is_shared: number;
   created_by_member_id: number;
   total_estimated: number | null;
   total_estimated_currency_id: number | null;
@@ -130,12 +131,14 @@ export async function confirmShoppingList(params: {
     unitPriceCurrencyId: number | null;
   }>;
   displayCurrencyId: number;
+  isShared: boolean;
 }): Promise<ShoppingListRecord> {
   const rows = await callProcedure<ShoppingListRecord>('sp_shopping_list_confirm', [
     params.shoppingListId,
     params.householdId,
     JSON.stringify(params.items),
     params.displayCurrencyId,
+    params.isShared ? 1 : 0,
   ]);
   return rows[0];
 }

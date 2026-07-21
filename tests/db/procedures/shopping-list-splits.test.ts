@@ -10,6 +10,7 @@ import { createProduct, listCategories, listUnits } from '@/lib/db/procedures/pr
 import {
   confirmShoppingList,
   generateOrGetShoppingList,
+  getShoppingList,
   getShoppingListItems,
 } from '@/lib/db/procedures/shopping-list';
 import { getSplit, initSplit, updateSplit } from '@/lib/db/procedures/shopping-list-splits';
@@ -88,6 +89,7 @@ async function confirmAListWithDeficit(params: {
   optimalQuantity: number;
   currentQuantity: number;
   defaultPrice: number;
+  isShared?: boolean;
 }): Promise<{ shoppingListId: number }> {
   const [category] = await listCategories();
   const [unit] = await listUnits();
@@ -114,6 +116,7 @@ async function confirmAListWithDeficit(params: {
       unitPriceCurrencyId: item.unit_price_currency_id,
     })),
     displayCurrencyId: CRC_ID,
+    isShared: params.isShared ?? true,
   });
   return { shoppingListId: list.id };
 }
@@ -421,5 +424,41 @@ describe('updateSplit (transactional)', () => {
         updates: [{ memberId: memberIdB, percentage: 100 }],
       }),
     ).rejects.toThrow(/not found in this household/i);
+  });
+});
+
+describe('sp_shopping_list_confirm — is_shared flag', () => {
+  it('records is_shared = 1 when confirmed as shared', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId,
+      memberId,
+      suffix,
+      optimalQuantity: 3,
+      currentQuantity: 0,
+      defaultPrice: 1000,
+      isShared: true,
+    });
+
+    const list = await getShoppingList(shoppingListId, householdId, CRC_ID);
+    expect(list.is_shared).toBe(1);
+  });
+
+  it('records is_shared = 0 when confirmed as "solo mía"', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId,
+      memberId,
+      suffix,
+      optimalQuantity: 3,
+      currentQuantity: 0,
+      defaultPrice: 1000,
+      isShared: false,
+    });
+
+    const list = await getShoppingList(shoppingListId, householdId, CRC_ID);
+    expect(list.is_shared).toBe(0);
   });
 });

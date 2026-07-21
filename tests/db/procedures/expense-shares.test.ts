@@ -13,7 +13,12 @@ import {
   listOccurrences,
   markOccurrencePaid,
 } from '@/lib/db/procedures/recurring-expenses';
-import { listRecurringExpenseShares, setRecurringExpenseShares } from '@/lib/db/procedures/expense-shares';
+import {
+  listRecurringExpenseShares,
+  setRecurringExpenseShares,
+  listExpenseOccurrenceShares,
+  markExpenseOccurrenceSharePaid,
+} from '@/lib/db/procedures/expense-shares';
 import { uniqueSuffix } from '../../helpers/db';
 import { callProcedure } from '@/lib/db/call';
 import type { RowDataPacket } from 'mysql2';
@@ -333,5 +338,132 @@ describe('automatic occurrence share snapshotting', () => {
 
     expect(rowsBefore).toHaveLength(2);
     expect(rowsAfter).toHaveLength(2);
+  });
+});
+
+async function createOneTimeExpense(params: {
+  householdId: number;
+  memberId: number;
+  suffix: string;
+  amount: number;
+  dueDate: string;
+}): Promise<{ recurringExpenseId: number }> {
+  const [category] = await listExpenseCategories();
+  const expense = await createRecurringExpense({
+    householdId: params.householdId,
+    name: `Gasto unico ${params.suffix}`,
+    categoryId: category.id,
+    amount: params.amount,
+    currencyId: CRC_ID,
+    periodicity: 'one_time',
+    dueDayConfig: null,
+    withdrawalDay: null,
+    firstDueDate: params.dueDate,
+    responsibleMemberId: params.memberId,
+    createdByMemberId: params.memberId,
+  });
+  return { recurringExpenseId: expense.id };
+}
+
+describe('per-member payment tracking for shared one_time expenses', () => {
+  it('populates share rows on the already-existing occurrence when shares are configured after creation', async () => {
+    // one_time expenses only ever get ONE occurrence, created inline by
+    // createRecurringExpense — before the "Editar" UI can ever call
+    // setRecurringExpenseShares. Without re-snapshotting after the fact, this
+    // occurrence would be stuck with zero share rows forever.
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({ householdId, invitedByMemberId: memberId, suffix });
+    const { recurringExpenseId } = await createOneTimeExpense({
+      householdId,
+      memberId,
+      suffix,
+      amount: 10000,
+      dueDate: '2030-01-15',
+    });
+
+    const [occurrence] = await listOccurrences(recurringExpenseId, householdId);
+    const before = await listExpenseOccurrenceShares(occurrence.id, householdId);
+    expect(before).toHaveLength(0);
+
+    await setRecurringExpenseShares({
+      recurringExpenseId,
+      householdId,
+      shares: [
+        { memberId, percentage: 50 },
+        { memberId: secondMemberId, percentage: 50 },
+      ],
+    });
+
+    const after = await listExpenseOccurrenceShares(occurrence.id, householdId);
+    expect(after).toHaveLength(2);
+    expect(after.find((r) => r.member_id === memberId)?.amount_owed).toBe(5000);
+    expect(after.find((r) => r.member_id === secondMemberId)?.amount_owed).toBe(5000);
+    expect(after.every((r) => r.is_paid === 0)).toBe(true);
+  });
+
+  it('marks each share paid independently and only flips the occurrence to paid once every share is paid', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createOwner(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({ householdId, invitedByMemberId: memberId, suffix });
+    const { recurringExpenseId } = await createOneTimeExpense({
+      householdId,
+      memberId,
+      suffix,
+      amount: 8000,
+      dueDate: '2030-02-01',
+    });
+    await setRecurringExpenseShares({
+      recurringExpenseId,
+      householdId,
+      shares: [
+        { memberId, percentage: 50 },
+        { memberId: secondMemberId, percentage: 50 },
+      ],
+    });
+    const [occurrence] = await listOccurrences(recurringExpenseId, householdId);
+    const [shareA, shareB] = await listExpenseOccurrenceShares(occurrence.id, householdId);
+
+    const afterFirst = await markExpenseOccurrenceSharePaid({ shareId: shareA.id, householdId, isPaid: true });
+    expect(afterFirst.find((s) => s.id === shareA.id)?.is_paid).toBe(1);
+    expect(afterFirst.find((s) => s.id === shareB.id)?.is_paid).toBe(0);
+    const [occurrenceAfterFirst] = await listOccurrences(recurringExpenseId, householdId);
+    expect(occurrenceAfterFirst.is_paid).toBe(0);
+
+    const afterSecond = await markExpenseOccurrenceSharePaid({ shareId: shareB.id, householdId, isPaid: true });
+    expect(afterSecond.every((s) => s.is_paid === 1)).toBe(true);
+    const [occurrenceAfterSecond] = await listOccurrences(recurringExpenseId, householdId);
+    expect(occurrenceAfterSecond.is_paid).toBe(1);
+
+    // Unmarking one share reopens the occurrence.
+    const afterUnmark = await markExpenseOccurrenceSharePaid({ shareId: shareA.id, householdId, isPaid: false });
+    expect(afterUnmark.find((s) => s.id === shareA.id)?.is_paid).toBe(0);
+    const [occurrenceAfterUnmark] = await listOccurrences(recurringExpenseId, householdId);
+    expect(occurrenceAfterUnmark.is_paid).toBe(0);
+  });
+
+  it('rejects marking a share paid from a different household', async () => {
+    const suffixA = uniqueSuffix();
+    const suffixB = uniqueSuffix();
+    const { householdId: householdIdA, memberId: memberIdA } = await createOwner(suffixA);
+    const { householdId: householdIdB } = await createOwner(suffixB);
+    const { recurringExpenseId } = await createOneTimeExpense({
+      householdId: householdIdA,
+      memberId: memberIdA,
+      suffix: suffixA,
+      amount: 4000,
+      dueDate: '2030-03-01',
+    });
+    await setRecurringExpenseShares({
+      recurringExpenseId,
+      householdId: householdIdA,
+      shares: [{ memberId: memberIdA, percentage: 100 }],
+    });
+    const [occurrence] = await listOccurrences(recurringExpenseId, householdIdA);
+    const [share] = await listExpenseOccurrenceShares(occurrence.id, householdIdA);
+
+    await expect(
+      markExpenseOccurrenceSharePaid({ shareId: share.id, householdId: householdIdB, isPaid: true }),
+    ).rejects.toThrow(/not found in this household/i);
   });
 });

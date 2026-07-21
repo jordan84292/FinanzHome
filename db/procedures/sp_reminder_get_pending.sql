@@ -28,7 +28,13 @@ BEGIN
       SELECT 1 FROM reminder_log rl
       WHERE rl.occurrence_id = eo.id AND rl.member_id = re.responsible_member_id
         AND rl.reminder_type = 'due_week' AND rl.sent_date = p_today
-    );
+    )
+    -- shared one_time expenses use per-member payment tracking instead of a
+    -- single mark-paid action, and are deliberately excluded from every
+    -- automatic reminder (see sp_expense_occurrence_share_mark_paid).
+    AND NOT (re.periodicity = 'one_time' AND EXISTS (
+      SELECT 1 FROM recurring_expense_shares res WHERE res.recurring_expense_id = re.id
+    ));
 
   -- due_soon: unpaid occurrence due tomorrow, not already logged today
   INSERT INTO tmp_pending_reminders (occurrence_id, recurring_expense_id, member_id, reminder_type)
@@ -42,7 +48,10 @@ BEGIN
       SELECT 1 FROM reminder_log rl
       WHERE rl.occurrence_id = eo.id AND rl.member_id = re.responsible_member_id
         AND rl.reminder_type = 'due_soon' AND rl.sent_date = p_today
-    );
+    )
+    AND NOT (re.periodicity = 'one_time' AND EXISTS (
+      SELECT 1 FROM recurring_expense_shares res WHERE res.recurring_expense_id = re.id
+    ));
 
   -- due_today: unpaid occurrence due today, not already logged today
   INSERT INTO tmp_pending_reminders (occurrence_id, recurring_expense_id, member_id, reminder_type)
@@ -56,7 +65,10 @@ BEGIN
       SELECT 1 FROM reminder_log rl
       WHERE rl.occurrence_id = eo.id AND rl.member_id = re.responsible_member_id
         AND rl.reminder_type = 'due_today' AND rl.sent_date = p_today
-    );
+    )
+    AND NOT (re.periodicity = 'one_time' AND EXISTS (
+      SELECT 1 FROM recurring_expense_shares res WHERE res.recurring_expense_id = re.id
+    ));
 
   -- overdue_daily: any unpaid occurrence past its due date, every day, until
   -- it's marked paid. Previously waited for the responsible member's next
@@ -73,7 +85,10 @@ BEGIN
       SELECT 1 FROM reminder_log rl
       WHERE rl.occurrence_id = eo.id AND rl.member_id = re.responsible_member_id
         AND rl.reminder_type = 'overdue_daily' AND rl.sent_date = p_today
-    );
+    )
+    AND NOT (re.periodicity = 'one_time' AND EXISTS (
+      SELECT 1 FROM recurring_expense_shares res WHERE res.recurring_expense_id = re.id
+    ));
 
   -- withdrawal: active weekly/biweekly expense whose withdrawal_day matches today's
   -- day-of-month, joined to its current open (earliest unpaid) occurrence.

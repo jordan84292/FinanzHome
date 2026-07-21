@@ -78,7 +78,8 @@ BEGIN
     END IF;
   END IF;
 
-  SELECT eos.id, eos.occurrence_id, eos.member_id, hm.display_name, eos.percentage, eos.amount_owed
+  SELECT eos.id, eos.occurrence_id, eos.member_id, hm.display_name, eos.percentage, eos.amount_owed,
+         eos.is_paid, eos.paid_at
   FROM expense_occurrence_shares eos
   INNER JOIN household_members hm ON hm.id = eos.member_id
   WHERE eos.occurrence_id = p_occurrence_id

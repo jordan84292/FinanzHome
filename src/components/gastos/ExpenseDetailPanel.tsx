@@ -7,10 +7,13 @@ import {
   updateOccurrenceDueDateAction,
   getInstallmentsAction,
   markInstallmentPaidAction,
+  getExpenseOccurrenceSharesAction,
+  markExpenseOccurrenceSharePaidAction,
 } from '@/app/gastos/actions';
 import { showError, showSuccess } from '@/lib/ui/alerts';
 import type { ExpenseOccurrenceRecord, RecurringExpenseRecord } from '@/lib/db/procedures/recurring-expenses';
 import type { ExpenseInstallmentRecord } from '@/lib/db/procedures/expense-installments';
+import type { ExpenseOccurrenceShareRecord } from '@/lib/db/procedures/expense-shares';
 
 function InstallmentsSection({ recurringExpenseId }: { recurringExpenseId: number }) {
   const [installments, setInstallments] = useState<ExpenseInstallmentRecord[] | null>(null);
@@ -97,6 +100,7 @@ export function ExpenseDetailPanel({
   const [isPending, startTransition] = useTransition();
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [editedDate, setEditedDate] = useState('');
+  const [shares, setShares] = useState<ExpenseOccurrenceShareRecord[] | null>(null);
 
   useEffect(() => {
     getOccurrencesAction(expense.id).then((result) => {
@@ -110,6 +114,46 @@ export function ExpenseDetailPanel({
   }, [expense.id]);
 
   const nextUnpaid = occurrences?.find((o) => o.is_paid === 0) ?? null;
+  const nextUnpaidId = nextUnpaid?.id ?? null;
+
+  useEffect(() => {
+    if (nextUnpaidId === null) {
+      setShares(null);
+      return;
+    }
+    getExpenseOccurrenceSharesAction(nextUnpaidId).then((result) => {
+      if (result.error) {
+        showError(result.error);
+        return;
+      }
+      setShares(result.shares);
+    });
+  }, [nextUnpaidId]);
+
+  const isShared = shares !== null && shares.length > 0;
+
+  function handleToggleShare(shareId: number, isPaid: boolean): void {
+    startTransition(() => {
+      markExpenseOccurrenceSharePaidAction(shareId, isPaid).then((result) => {
+        if (result.error) {
+          showError(result.error);
+          return;
+        }
+        setShares(result.shares);
+        const allPaid = result.shares.length > 0 && result.shares.every((s) => s.is_paid === 1);
+        setOccurrences((prev) =>
+          prev
+            ? prev.map((o) =>
+                nextUnpaidId !== null && o.id === nextUnpaidId
+                  ? { ...o, is_paid: allPaid ? 1 : 0, paid_at: allPaid ? new Date().toISOString() : null }
+                  : o,
+              )
+            : prev,
+        );
+        showSuccess(isPaid ? 'Pago registrado.' : 'Pago desmarcado.');
+      });
+    });
+  }
 
   function handleMarkPaid(): void {
     if (!nextUnpaid) return;
@@ -204,6 +248,41 @@ export function ExpenseDetailPanel({
             >
               Cancelar
             </button>
+          </div>
+        ) : expense.is_active === 1 && nextUnpaid && isShared ? (
+          <div className="mb-3">
+            <div className="d-flex justify-content-between align-items-center mb-1">
+              <span className={shares!.every((s) => s.is_paid === 1) ? 'badge text-bg-success' : 'text-body-secondary small'}>
+                Pagado {shares!.filter((s) => s.is_paid === 1).length}/{shares!.length}
+              </span>
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm"
+                disabled={isPending}
+                onClick={handleStartEditDate}
+                aria-label="Editar fecha de vencimiento"
+              >
+                <i className="bi bi-pencil" /> Vence {nextUnpaid.due_date}
+              </button>
+            </div>
+            {shares!.map((share) => (
+              <div key={share.id} className="d-flex align-items-center justify-content-between py-2 border-top">
+                <div className="d-flex align-items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
+                    checked={share.is_paid === 1}
+                    disabled={isPending}
+                    onChange={(e) => handleToggleShare(share.id, e.target.checked)}
+                  />
+                  <span>{share.display_name}</span>
+                </div>
+                <span className={share.is_paid === 1 ? 'text-success' : 'text-body-secondary'}>
+                  {expense.currency_symbol}
+                  {share.amount_owed}
+                </span>
+              </div>
+            ))}
           </div>
         ) : expense.is_active === 1 && nextUnpaid ? (
           <div className="d-flex gap-2 mb-3">

@@ -144,7 +144,9 @@ export function ShoppingListClient({
             <ConfirmPurchaseButton
               shoppingListId={displayList.id}
               disabled={!isOnline}
-              onConfirmed={setConfirmedListId}
+              onConfirmed={(id, isShared) => {
+                if (isShared) setConfirmedListId(id);
+              }}
             />
           </div>
           <Link href="/inventario" className="btn btn-outline-secondary btn-sm w-100">

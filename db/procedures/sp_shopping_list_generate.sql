@@ -30,7 +30,7 @@ BEGIN
       WHERE sli.shopping_list_id = v_list_id AND sli.product_id = p.id
     );
 
-  SELECT id, household_id, status, created_by_member_id, total_estimated, total_estimated_currency_id, created_at, confirmed_at
+  SELECT id, household_id, status, is_shared, created_by_member_id, total_estimated, total_estimated_currency_id, created_at, confirmed_at
   FROM shopping_lists
   WHERE id = v_list_id;
 END;

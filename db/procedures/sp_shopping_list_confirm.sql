@@ -4,7 +4,8 @@ CREATE PROCEDURE sp_shopping_list_confirm(
   IN p_shopping_list_id INT UNSIGNED,
   IN p_household_id INT UNSIGNED,
   IN p_items_json JSON,
-  IN p_display_currency_id TINYINT UNSIGNED
+  IN p_display_currency_id TINYINT UNSIGNED,
+  IN p_is_shared TINYINT(1)
 )
 BEGIN
   DECLARE v_exists INT;
@@ -90,12 +91,13 @@ BEGIN
 
   UPDATE shopping_lists
   SET status = 'confirmed',
+      is_shared = p_is_shared,
       total_estimated = v_total,
       total_estimated_currency_id = p_display_currency_id,
       confirmed_at = NOW()
   WHERE id = p_shopping_list_id;
 
-  SELECT id, household_id, status, created_by_member_id, total_estimated, total_estimated_currency_id, created_at, confirmed_at
+  SELECT id, household_id, status, is_shared, created_by_member_id, total_estimated, total_estimated_currency_id, created_at, confirmed_at
   FROM shopping_lists
   WHERE id = p_shopping_list_id;
 END;

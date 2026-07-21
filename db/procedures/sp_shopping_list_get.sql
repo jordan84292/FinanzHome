@@ -24,7 +24,7 @@ BEGIN
   LIMIT 1;
 
   SELECT
-    sl.id, sl.household_id, sl.status, sl.created_by_member_id,
+    sl.id, sl.household_id, sl.status, sl.is_shared, sl.created_by_member_id,
     sl.total_estimated, sl.total_estimated_currency_id, sl.created_at, sl.confirmed_at,
     (
       SELECT ROUND(SUM(

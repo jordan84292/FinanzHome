@@ -16,7 +16,10 @@ import {
 import {
   listRecurringExpenseShares,
   setRecurringExpenseShares,
+  listExpenseOccurrenceShares,
+  markExpenseOccurrenceSharePaid,
   type ExpenseShareRecord,
+  type ExpenseOccurrenceShareRecord,
 } from '@/lib/db/procedures/expense-shares';
 import {
   generateInstallmentsForMonth,
@@ -365,5 +368,39 @@ export async function markInstallmentPaidAction(installmentId: number): Promise<
     return { installment, error: null };
   } catch {
     return { installment: null, error: 'No se pudo marcar la cuota como pagada.' };
+  }
+}
+
+export interface GetExpenseOccurrenceSharesState {
+  shares: ExpenseOccurrenceShareRecord[];
+  error: string | null;
+}
+
+export async function getExpenseOccurrenceSharesAction(occurrenceId: number): Promise<GetExpenseOccurrenceSharesState> {
+  const membership = await requireMembership();
+  try {
+    const shares = await listExpenseOccurrenceShares(occurrenceId, membership.id);
+    return { shares, error: null };
+  } catch {
+    return { shares: [], error: 'No se pudo cargar el detalle de pagos de este gasto.' };
+  }
+}
+
+export interface MarkExpenseOccurrenceSharePaidState {
+  shares: ExpenseOccurrenceShareRecord[];
+  error: string | null;
+}
+
+export async function markExpenseOccurrenceSharePaidAction(
+  shareId: number,
+  isPaid: boolean,
+): Promise<MarkExpenseOccurrenceSharePaidState> {
+  const membership = await requireMembership();
+  try {
+    const shares = await markExpenseOccurrenceSharePaid({ shareId, householdId: membership.id, isPaid });
+    revalidatePath('/gastos');
+    return { shares, error: null };
+  } catch {
+    return { shares: [], error: 'No se pudo actualizar el pago de este miembro.' };
   }
 }

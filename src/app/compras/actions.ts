@@ -121,7 +121,10 @@ export interface ConfirmPurchaseState {
   error: string | null;
 }
 
-export async function confirmPurchaseAction(shoppingListId: number): Promise<ConfirmPurchaseState> {
+export async function confirmPurchaseAction(
+  shoppingListId: number,
+  isShared: boolean,
+): Promise<ConfirmPurchaseState> {
   const membership = await requireMembership();
 
   const items = await getShoppingListItems(shoppingListId, membership.id, DISPLAY_CURRENCY_ID);
@@ -140,17 +143,20 @@ export async function confirmPurchaseAction(shoppingListId: number): Promise<Con
         unitPriceCurrencyId: item.unit_price_currency_id,
       })),
       displayCurrencyId: DISPLAY_CURRENCY_ID,
+      isShared,
     });
   } catch {
     return { error: 'No se pudo confirmar la compra. Intentá de nuevo.' };
   }
 
-  try {
-    await initSplit(shoppingListId, membership.id);
-  } catch {
-    // La compra ya se confirmó (inventario actualizado); solo falló la
-    // inicialización de la división del gasto. No hay que decirle al usuario
-    // que la compra falló ni pedirle que reintente confirmar.
+  if (isShared) {
+    try {
+      await initSplit(shoppingListId, membership.id);
+    } catch {
+      // La compra ya se confirmó (inventario actualizado); solo falló la
+      // inicialización de la división del gasto. No hay que decirle al usuario
+      // que la compra falló ni pedirle que reintente confirmar.
+    }
   }
 
   revalidatePath('/compras');
@@ -168,7 +174,7 @@ export async function getSplitAction(shoppingListId: number): Promise<GetSplitSt
     let splits = await getSplit(shoppingListId, membership.id);
     if (splits.length === 0) {
       const list = await getShoppingList(shoppingListId, membership.id, DISPLAY_CURRENCY_ID);
-      if (list.status === 'confirmed') {
+      if (list.status === 'confirmed' && list.is_shared === 1) {
         splits = await initSplit(shoppingListId, membership.id);
       }
     }
