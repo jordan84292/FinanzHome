@@ -25,7 +25,8 @@ BEGIN
 
   SELECT
     sl.id, sl.household_id, sl.status, sl.is_shared, sl.created_by_member_id,
-    sl.total_estimated, sl.total_actual, sl.total_estimated_currency_id, sl.created_at, sl.confirmed_at,
+    sl.total_estimated, sl.total_actual, sl.paid_by_member_id, hm.display_name AS paid_by_display_name,
+    sl.total_estimated_currency_id, sl.created_at, sl.confirmed_at,
     (
       SELECT ROUND(SUM(
         sli.quantity_needed * IFNULL(sli.unit_price, 0) *
@@ -40,5 +41,6 @@ BEGIN
       WHERE sli.shopping_list_id = sl.id
     ) AS total_estimated_live
   FROM shopping_lists sl
+  LEFT JOIN household_members hm ON hm.id = sl.paid_by_member_id
   WHERE sl.id = p_shopping_list_id;
 END;

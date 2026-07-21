@@ -13,7 +13,7 @@ import {
   getShoppingList,
   getShoppingListItems,
 } from '@/lib/db/procedures/shopping-list';
-import { getSplit, initSplit, updateSplit } from '@/lib/db/procedures/shopping-list-splits';
+import { getDebtsOwedByMember, getSplit, initSplit, markSplitPaid, updateSplit } from '@/lib/db/procedures/shopping-list-splits';
 import { uniqueSuffix } from '../../helpers/db';
 
 const CRC_ID = 1;
@@ -91,6 +91,7 @@ async function confirmAListWithDeficit(params: {
   defaultPrice: number;
   isShared?: boolean;
   actualTotal?: number;
+  paidByMemberId?: number;
 }): Promise<{ shoppingListId: number }> {
   const [category] = await listCategories();
   const [unit] = await listUnits();
@@ -120,6 +121,7 @@ async function confirmAListWithDeficit(params: {
     displayCurrencyId: CRC_ID,
     isShared: params.isShared ?? true,
     actualTotal: params.actualTotal ?? estimatedTotal,
+    paidByMemberId: params.paidByMemberId ?? params.memberId,
   });
   return { shoppingListId: list.id };
 }
@@ -486,5 +488,73 @@ describe('sp_shopping_list_confirm — is_shared flag', () => {
 
     const list = await getShoppingList(shoppingListId, householdId, CRC_ID);
     expect(list.is_shared).toBe(0);
+  });
+});
+
+describe('sp_shopping_list_debts_owed', () => {
+  it('reports what the debtor owes the payer, excluding the payer\'s own share', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({ householdId, invitedByMemberId: memberId, suffix });
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId,
+      memberId,
+      suffix,
+      optimalQuantity: 10,
+      currentQuantity: 0,
+      defaultPrice: 1000,
+      paidByMemberId: memberId,
+    });
+    await initSplit(shoppingListId, householdId);
+
+    const payerDebts = await getDebtsOwedByMember(memberId, householdId);
+    expect(payerDebts).toHaveLength(0);
+
+    const debtorDebts = await getDebtsOwedByMember(secondMemberId, householdId);
+    expect(debtorDebts).toHaveLength(1);
+    expect(debtorDebts[0].paid_by_member_id).toBe(memberId);
+    expect(debtorDebts[0].pending_count).toBe(1);
+    expect(debtorDebts[0].amount_owed).toBe(5000);
+  });
+
+  it('stops reporting a debt once the debtor marks their split as paid', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({ householdId, invitedByMemberId: memberId, suffix });
+    const { shoppingListId } = await confirmAListWithDeficit({
+      householdId,
+      memberId,
+      suffix,
+      optimalQuantity: 10,
+      currentQuantity: 0,
+      defaultPrice: 1000,
+      paidByMemberId: memberId,
+    });
+    const splits = await initSplit(shoppingListId, householdId);
+    const debtorSplit = splits.find((s) => s.member_id === secondMemberId)!;
+
+    await markSplitPaid({ splitId: debtorSplit.id, householdId, isPaid: true });
+
+    const debtorDebts = await getDebtsOwedByMember(secondMemberId, householdId);
+    expect(debtorDebts).toHaveLength(0);
+  });
+
+  it('reports no debts for an unshared ("solo mía") purchase', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const { memberId: secondMemberId } = await addSecondMember({ householdId, invitedByMemberId: memberId, suffix });
+    await confirmAListWithDeficit({
+      householdId,
+      memberId,
+      suffix,
+      optimalQuantity: 10,
+      currentQuantity: 0,
+      defaultPrice: 1000,
+      isShared: false,
+      paidByMemberId: memberId,
+    });
+
+    const debtorDebts = await getDebtsOwedByMember(secondMemberId, householdId);
+    expect(debtorDebts).toHaveLength(0);
   });
 });

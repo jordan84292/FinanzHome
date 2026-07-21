@@ -294,11 +294,13 @@ describe('shopping list confirm procedure', () => {
       displayCurrencyId: CRC_ID,
       isShared: true,
       actualTotal: 3200,
+      paidByMemberId: memberId,
     });
 
     expect(confirmed.status).toBe('confirmed');
     expect(confirmed.total_estimated).toBe(3000);
     expect(confirmed.total_actual).toBe(3200);
+    expect(confirmed.paid_by_member_id).toBe(memberId);
     expect(confirmed.total_estimated_currency_id).toBe(CRC_ID);
 
     const updatedItems = await getShoppingListItems(list.id, householdId, CRC_ID);
@@ -343,6 +345,7 @@ describe('shopping list confirm procedure', () => {
         displayCurrencyId: CRC_ID,
         isShared: true,
         actualTotal: 0,
+        paidByMemberId: memberIdA,
       }),
     ).rejects.toThrow(/not found/i);
   });
@@ -379,6 +382,7 @@ describe('shopping list confirm procedure', () => {
       displayCurrencyId: CRC_ID,
       isShared: true,
       actualTotal: 0,
+      paidByMemberId: memberId,
     });
 
     await expect(
@@ -389,6 +393,7 @@ describe('shopping list confirm procedure', () => {
         displayCurrencyId: CRC_ID,
         isShared: true,
         actualTotal: 0,
+        paidByMemberId: memberId,
       }),
     ).rejects.toThrow(/not found or already confirmed/i);
   });
@@ -425,7 +430,47 @@ describe('shopping list confirm procedure', () => {
         displayCurrencyId: CRC_ID,
         isShared: true,
         actualTotal: -100,
+        paidByMemberId: memberId,
       }),
     ).rejects.toThrow(/actual total spent is required/i);
+  });
+
+  it('rejects a paid-by member that does not belong to the household', async () => {
+    const suffixA = uniqueSuffix();
+    const suffixB = uniqueSuffix();
+    const { householdId: householdIdA, memberId: memberIdA } = await createMember(suffixA);
+    const { memberId: memberIdB } = await createMember(suffixB);
+    const [category] = await listCategories();
+    const [unit] = await listUnits();
+    await createProduct({
+      householdId: householdIdA,
+      name: `Pan ${suffixA}`,
+      categoryId: category.id,
+      unitId: unit.id,
+      optimalQuantity: 1,
+      currentQuantity: 0,
+      defaultPrice: null,
+      defaultPriceCurrencyId: null,
+      createdByMemberId: memberIdA,
+    });
+    const list = await generateOrGetShoppingList(householdIdA, memberIdA);
+    const items = await getShoppingListItems(list.id, householdIdA, CRC_ID);
+
+    await expect(
+      confirmShoppingList({
+        shoppingListId: list.id,
+        householdId: householdIdA,
+        items: items.map((item) => ({
+          itemId: item.id,
+          quantity: item.quantity_needed,
+          unitPrice: item.unit_price,
+          unitPriceCurrencyId: item.unit_price_currency_id,
+        })),
+        displayCurrencyId: CRC_ID,
+        isShared: true,
+        actualTotal: 100,
+        paidByMemberId: memberIdB,
+      }),
+    ).rejects.toThrow(/member who paid is not found/i);
   });
 });

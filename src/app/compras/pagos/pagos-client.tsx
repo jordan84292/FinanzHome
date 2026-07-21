@@ -83,6 +83,7 @@ export function PagosPendientesClient({ payments }: { payments: ShoppingListPaym
                       <div className="text-body-secondary small">
                         Total: {first.currency_symbol}
                         {first.total_actual}
+                        {first.paid_by_display_name ? ` · Pagó ${first.paid_by_display_name}` : ''}
                       </div>
                     </div>
                     {allPaid ? <span className="badge text-bg-success">Todos pagaron</span> : null}

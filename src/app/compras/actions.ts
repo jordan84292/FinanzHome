@@ -12,10 +12,12 @@ import {
   updateShoppingListItem,
 } from '@/lib/db/procedures/shopping-list';
 import {
+  getDebtsOwedByMember,
   getSplit,
   initSplit,
   markSplitPaid,
   updateSplit,
+  type ShoppingListDebtRecord,
   type ShoppingListSplitRecord,
 } from '@/lib/db/procedures/shopping-list-splits';
 
@@ -125,12 +127,17 @@ export async function confirmPurchaseAction(
   shoppingListId: number,
   isShared: boolean,
   actualTotal: number,
+  paidByMemberId: number,
 ): Promise<ConfirmPurchaseState> {
   const membership = await requireMembership();
 
   const parsedTotal = z.coerce.number().min(0, 'El monto gastado no puede ser negativo').safeParse(actualTotal);
   if (!parsedTotal.success) {
     return { error: parsedTotal.error.issues[0]?.message ?? 'Ingresá el monto gastado' };
+  }
+  const parsedPaidBy = z.coerce.number().int().positive().safeParse(paidByMemberId);
+  if (!parsedPaidBy.success) {
+    return { error: 'Seleccioná quién pagó la compra' };
   }
 
   const items = await getShoppingListItems(shoppingListId, membership.id, DISPLAY_CURRENCY_ID);
@@ -151,6 +158,7 @@ export async function confirmPurchaseAction(
       displayCurrencyId: DISPLAY_CURRENCY_ID,
       isShared,
       actualTotal: parsedTotal.data,
+      paidByMemberId: parsedPaidBy.data,
     });
   } catch {
     return { error: 'No se pudo confirmar la compra. Intentá de nuevo.' };
@@ -232,5 +240,20 @@ export async function markSplitPaidAction(splitId: number, isPaid: boolean): Pro
     return { split, error: null };
   } catch {
     return { split: null, error: 'No se pudo actualizar el pago.' };
+  }
+}
+
+export interface GetMyShoppingDebtsState {
+  debts: ShoppingListDebtRecord[];
+  error: string | null;
+}
+
+export async function getMyShoppingDebtsAction(): Promise<GetMyShoppingDebtsState> {
+  const membership = await requireMembership();
+  try {
+    const debts = await getDebtsOwedByMember(membership.member_id, membership.id);
+    return { debts, error: null };
+  } catch {
+    return { debts: [], error: 'No se pudo revisar los pagos pendientes.' };
   }
 }

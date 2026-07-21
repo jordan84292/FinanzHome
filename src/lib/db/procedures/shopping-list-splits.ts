@@ -17,6 +17,8 @@ export interface ShoppingListPaymentRecord extends RowDataPacket {
   shopping_list_id: number;
   confirmed_at: string;
   total_actual: number;
+  paid_by_member_id: number | null;
+  paid_by_display_name: string | null;
   total_estimated_currency_id: number;
   currency_symbol: string;
   split_id: number;
@@ -26,6 +28,14 @@ export interface ShoppingListPaymentRecord extends RowDataPacket {
   amount_owed: number;
   is_paid: number;
   paid_at: string | null;
+}
+
+export interface ShoppingListDebtRecord extends RowDataPacket {
+  paid_by_member_id: number;
+  payer_display_name: string;
+  pending_count: number;
+  amount_owed: number;
+  currency_symbol: string | null;
 }
 
 export async function initSplit(
@@ -84,4 +94,11 @@ export async function markSplitPaid(params: {
 
 export async function listPendingPayments(householdId: number): Promise<ShoppingListPaymentRecord[]> {
   return callProcedure<ShoppingListPaymentRecord>('sp_shopping_list_payments_list', [householdId]);
+}
+
+export async function getDebtsOwedByMember(
+  memberId: number,
+  householdId: number,
+): Promise<ShoppingListDebtRecord[]> {
+  return callProcedure<ShoppingListDebtRecord>('sp_shopping_list_debts_owed', [memberId, householdId]);
 }

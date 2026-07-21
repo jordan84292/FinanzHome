@@ -10,6 +10,7 @@ import { useOnlineStatus } from '@/lib/pwa/use-online-status';
 import type { ProductRecord } from '@/lib/db/procedures/products';
 import type { ShoppingListItemRecord, ShoppingListRecord } from '@/lib/db/procedures/shopping-list';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
+import type { HouseholdMemberRecord } from '@/lib/db/procedures/household';
 
 export function ShoppingListClient({
   list,
@@ -17,12 +18,16 @@ export function ShoppingListClient({
   products,
   currencies,
   displayCurrencySymbol,
+  members,
+  currentMemberId,
 }: {
   list: ShoppingListRecord;
   items: ShoppingListItemRecord[];
   products: ProductRecord[];
   currencies: CurrencyRecord[];
   displayCurrencySymbol: string;
+  members: HouseholdMemberRecord[];
+  currentMemberId: number;
 }) {
   const [panel, setPanel] = useState<{ mode: 'add' } | { mode: 'edit'; item: ShoppingListItemRecord } | null>(
     null,
@@ -145,6 +150,8 @@ export function ShoppingListClient({
               shoppingListId={displayList.id}
               estimatedTotal={displayList.total_estimated_live ?? 0}
               currencySymbol={displayCurrencySymbol}
+              members={members}
+              currentMemberId={currentMemberId}
               disabled={!isOnline}
               onConfirmed={(id, isShared) => {
                 if (isShared) setConfirmedListId(id);

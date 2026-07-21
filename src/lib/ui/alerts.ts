@@ -10,6 +10,10 @@ export function showSuccess(message: string): void {
   void Swal.fire({ icon: 'success', title: 'Listo', text: message, timer: 2000, showConfirmButton: false });
 }
 
+export function showInfo(title: string, message: string): void {
+  void Swal.fire({ icon: 'info', title, text: message, confirmButtonText: 'Entendido' });
+}
+
 export async function confirmAction(message: string): Promise<boolean> {
   const result = await Swal.fire({
     icon: 'question',

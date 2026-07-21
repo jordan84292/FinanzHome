@@ -4,17 +4,22 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { confirmPurchaseAction } from './actions';
 import { showError, showSuccess } from '@/lib/ui/alerts';
+import type { HouseholdMemberRecord } from '@/lib/db/procedures/household';
 
 export function ConfirmPurchaseButton({
   shoppingListId,
   estimatedTotal,
   currencySymbol,
+  members,
+  currentMemberId,
   disabled = false,
   onConfirmed,
 }: {
   shoppingListId: number;
   estimatedTotal: number;
   currencySymbol: string;
+  members: HouseholdMemberRecord[];
+  currentMemberId: number;
   disabled?: boolean;
   onConfirmed: (shoppingListId: number, isShared: boolean) => void;
 }) {
@@ -22,11 +27,13 @@ export function ConfirmPurchaseButton({
   const [showModal, setShowModal] = useState(false);
   const [isShared, setIsShared] = useState(true);
   const [actualTotal, setActualTotal] = useState('');
+  const [paidByMemberId, setPaidByMemberId] = useState(currentMemberId);
   const router = useRouter();
 
   function handleOpen(): void {
     setActualTotal(estimatedTotal.toString());
     setIsShared(true);
+    setPaidByMemberId(currentMemberId);
     setShowModal(true);
   }
 
@@ -38,7 +45,7 @@ export function ConfirmPurchaseButton({
     }
     setShowModal(false);
     startTransition(() => {
-      confirmPurchaseAction(shoppingListId, isShared, parsedTotal)
+      confirmPurchaseAction(shoppingListId, isShared, parsedTotal, isShared ? paidByMemberId : currentMemberId)
         .then((result) => {
           if (result.error) {
             showError(result.error);
@@ -106,6 +113,26 @@ export function ConfirmPurchaseButton({
                 Solo mía
               </button>
             </div>
+
+            {isShared ? (
+              <div className="mb-3">
+                <label className="form-label small text-body-secondary" htmlFor="paid-by-select">
+                  ¿Quién pagó?
+                </label>
+                <select
+                  id="paid-by-select"
+                  className="form-select"
+                  value={paidByMemberId}
+                  onChange={(e) => setPaidByMemberId(Number(e.target.value))}
+                >
+                  {members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.id === currentMemberId ? `${member.display_name} (vos)` : member.display_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
 
             <div className="d-flex gap-2">
               <button type="button" className="btn btn-primary flex-grow-1" disabled={isPending} onClick={handleConfirm}>

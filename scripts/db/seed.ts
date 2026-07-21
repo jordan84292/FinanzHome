@@ -103,6 +103,7 @@ async function main(): Promise<void> {
     displayCurrencyId: CRC_ID,
     isShared: true,
     actualTotal: openListActualTotal,
+    paidByMemberId: jordanMemberId,
   });
   const splits = await initSplit(openList.id, household.id);
   const jordanSplit = splits.find((s) => s.member_id === jordanMemberId)!;

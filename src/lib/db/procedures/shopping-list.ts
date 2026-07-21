@@ -14,6 +14,8 @@ export interface ShoppingListRecord extends RowDataPacket {
    * stays as the pre-purchase reference (sum of item qty * unit price).
    */
   total_actual: number | null;
+  /** Who actually paid at checkout — selected at confirm time, not necessarily created_by_member_id. */
+  paid_by_member_id: number | null;
   total_estimated_currency_id: number | null;
   created_at: string;
   confirmed_at: string | null;
@@ -24,6 +26,8 @@ export interface ShoppingListRecord extends RowDataPacket {
    * full detail via getShoppingList() instead.
    */
   total_estimated_live?: number | null;
+  /** Only populated by sp_shopping_list_get (LEFT JOINs household_members for the payer's name). */
+  paid_by_display_name?: string | null;
 }
 
 export interface ShoppingListItemRecord extends RowDataPacket {
@@ -139,6 +143,7 @@ export async function confirmShoppingList(params: {
   displayCurrencyId: number;
   isShared: boolean;
   actualTotal: number;
+  paidByMemberId: number;
 }): Promise<ShoppingListRecord> {
   const rows = await callProcedure<ShoppingListRecord>('sp_shopping_list_confirm', [
     params.shoppingListId,
@@ -147,6 +152,7 @@ export async function confirmShoppingList(params: {
     params.displayCurrencyId,
     params.isShared ? 1 : 0,
     params.actualTotal,
+    params.paidByMemberId,
   ]);
   return rows[0];
 }

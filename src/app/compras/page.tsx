@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { getHouseholdsForUser } from '@/lib/db/procedures/household';
+import { getHouseholdsForUser, listHouseholdMembers } from '@/lib/db/procedures/household';
 import { listCurrencies } from '@/lib/db/procedures/currency';
 import { listProducts } from '@/lib/db/procedures/products';
 import {
@@ -25,11 +25,12 @@ export default async function ComprasPage() {
 
   const generated = await generateOrGetShoppingList(membership.id, membership.member_id);
 
-  const [list, items, products, currencies] = await Promise.all([
+  const [list, items, products, currencies, members] = await Promise.all([
     getShoppingList(generated.id, membership.id, DISPLAY_CURRENCY_ID),
     getShoppingListItems(generated.id, membership.id, DISPLAY_CURRENCY_ID),
     listProducts(membership.id),
     listCurrencies(),
+    listHouseholdMembers(membership.id),
   ]);
 
   const displayCurrency = currencies.find((c) => c.id === DISPLAY_CURRENCY_ID);
@@ -41,6 +42,8 @@ export default async function ComprasPage() {
       products={products}
       currencies={currencies}
       displayCurrencySymbol={displayCurrency?.symbol ?? ''}
+      members={members}
+      currentMemberId={membership.member_id}
     />
   );
 }

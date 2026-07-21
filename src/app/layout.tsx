@@ -7,6 +7,7 @@ import { Providers } from './providers';
 import { BottomNav } from '@/components/BottomNav';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { DebtReminder } from '@/components/DebtReminder';
 
 const fraunces = Fraunces({
   subsets: ['latin'],
@@ -49,6 +50,7 @@ export default function RootLayout({
           {children}
           <BottomNav />
           <ServiceWorkerRegister />
+          <DebtReminder />
         </Providers>
       </body>
     </html>
