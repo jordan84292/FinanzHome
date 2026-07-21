@@ -23,7 +23,7 @@ import {
 
 const addItemSchema = z.object({
   shoppingListId: z.coerce.number().int().positive(),
-  productId: z.coerce.number().int().positive(),
+  customName: z.string().trim().min(1, 'El nombre es obligatorio').max(150),
   quantityNeeded: z.coerce.number().positive(),
   unitPrice: z.coerce.number().min(0).optional(),
   unitPriceCurrencyId: z.coerce.number().int().positive().optional(),
@@ -41,7 +41,7 @@ export async function addItemAction(
 
   const parsed = addItemSchema.safeParse({
     shoppingListId: formData.get('shoppingListId'),
-    productId: formData.get('productId'),
+    customName: formData.get('customName'),
     quantityNeeded: formData.get('quantityNeeded'),
     unitPrice: formData.get('unitPrice') || undefined,
     unitPriceCurrencyId: formData.get('unitPriceCurrencyId') || undefined,
@@ -54,7 +54,7 @@ export async function addItemAction(
     await addShoppingListItem({
       shoppingListId: parsed.data.shoppingListId,
       householdId: membership.id,
-      productId: parsed.data.productId,
+      customName: parsed.data.customName,
       quantityNeeded: parsed.data.quantityNeeded,
       unitPrice: parsed.data.unitPrice ?? null,
       unitPriceCurrencyId: parsed.data.unitPriceCurrencyId ?? null,

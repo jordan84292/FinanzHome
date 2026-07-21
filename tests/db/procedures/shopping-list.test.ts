@@ -105,28 +105,15 @@ describe('shopping list generate/get/items-get procedures', () => {
 });
 
 describe('shopping list item edit procedures', () => {
-  it('adds an extra item not derived from any deficit', async () => {
+  it('adds an extra custom item not derived from any deficit', async () => {
     const suffix = uniqueSuffix();
     const { householdId, memberId } = await createMember(suffix);
-    const [category] = await listCategories();
-    const [unit] = await listUnits();
-    const product = await createProduct({
-      householdId,
-      name: `Chocolate ${suffix}`,
-      categoryId: category.id,
-      unitId: unit.id,
-      optimalQuantity: 0,
-      currentQuantity: 0,
-      defaultPrice: null,
-      defaultPriceCurrencyId: null,
-      createdByMemberId: memberId,
-    });
     const list = await generateOrGetShoppingList(householdId, memberId);
 
     const item = await addShoppingListItem({
       shoppingListId: list.id,
       householdId,
-      productId: product.id,
+      customName: `Chocolate ${suffix}`,
       quantityNeeded: 2,
       unitPrice: 2500,
       unitPriceCurrencyId: CRC_ID,
@@ -134,6 +121,8 @@ describe('shopping list item edit procedures', () => {
     });
 
     expect(item.is_extra).toBe(1);
+    expect(item.product_id).toBeNull();
+    expect(item.product_name).toBe(`Chocolate ${suffix}`);
     const items = await getShoppingListItems(list.id, householdId, CRC_ID);
     expect(items.map((i) => i.id)).toContain(item.id);
   });
@@ -226,37 +215,24 @@ describe('shopping list item edit procedures', () => {
     ).rejects.toThrow(/not found/i);
   });
 
-  it('rejects adding an item whose product belongs to a different household', async () => {
+  it('rejects adding a custom item to a shopping list from a different household', async () => {
     const suffixA = uniqueSuffix();
     const suffixB = uniqueSuffix();
     const { householdId: householdIdA, memberId: memberIdA } = await createMember(suffixA);
-    const { householdId: householdIdB, memberId: memberIdB } = await createMember(suffixB);
-    const [category] = await listCategories();
-    const [unit] = await listUnits();
-    const productA = await createProduct({
-      householdId: householdIdA,
-      name: `Naranjas ${suffixA}`,
-      categoryId: category.id,
-      unitId: unit.id,
-      optimalQuantity: 3,
-      currentQuantity: 0,
-      defaultPrice: null,
-      defaultPriceCurrencyId: null,
-      createdByMemberId: memberIdA,
-    });
-    const listB = await generateOrGetShoppingList(householdIdB, memberIdB);
+    const { householdId: householdIdB } = await createMember(suffixB);
+    const listA = await generateOrGetShoppingList(householdIdA, memberIdA);
 
     await expect(
       addShoppingListItem({
-        shoppingListId: listB.id,
+        shoppingListId: listA.id,
         householdId: householdIdB,
-        productId: productA.id,
+        customName: `Naranjas ${suffixA}`,
         quantityNeeded: 2,
         unitPrice: null,
         unitPriceCurrencyId: null,
         isExtra: true,
       }),
-    ).rejects.toThrow(/not found in this household/i);
+    ).rejects.toThrow(/not found or not open/i);
   });
 });
 
@@ -309,6 +285,46 @@ describe('shopping list confirm procedure', () => {
     const productsAfter = await listProducts(householdId);
     const updatedProduct = productsAfter.find((p) => p.id === product.id);
     expect(updatedProduct?.current_quantity).toBe(4);
+  });
+
+  it('confirms a list containing a custom (non-catalog) item without touching any inventory', async () => {
+    const suffix = uniqueSuffix();
+    const { householdId, memberId } = await createMember(suffix);
+    const list = await generateOrGetShoppingList(householdId, memberId);
+    const customItem = await addShoppingListItem({
+      shoppingListId: list.id,
+      householdId,
+      customName: `Souvenir ${suffix}`,
+      quantityNeeded: 1,
+      unitPrice: 1500,
+      unitPriceCurrencyId: CRC_ID,
+      isExtra: true,
+    });
+
+    const confirmed = await confirmShoppingList({
+      shoppingListId: list.id,
+      householdId,
+      items: [
+        {
+          itemId: customItem.id,
+          quantity: customItem.quantity_needed,
+          unitPrice: customItem.unit_price,
+          unitPriceCurrencyId: customItem.unit_price_currency_id,
+        },
+      ],
+      displayCurrencyId: CRC_ID,
+      isShared: false,
+      actualTotal: 1500,
+      paidByMemberId: memberId,
+    });
+
+    expect(confirmed.status).toBe('confirmed');
+    expect(confirmed.total_estimated).toBe(1500);
+
+    const updatedItems = await getShoppingListItems(list.id, householdId, CRC_ID);
+    const updatedCustomItem = updatedItems.find((i) => i.id === customItem.id)!;
+    expect(updatedCustomItem.is_purchased).toBe(1);
+    expect(updatedCustomItem.product_id).toBeNull();
   });
 
   it('rejects confirming a list that belongs to a different household', async () => {

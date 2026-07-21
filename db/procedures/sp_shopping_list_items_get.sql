@@ -24,7 +24,8 @@ BEGIN
   LIMIT 1;
 
   SELECT
-    sli.id, sli.shopping_list_id, sli.product_id, p.name AS product_name, u.code AS unit_code,
+    sli.id, sli.shopping_list_id, sli.product_id, sli.custom_name,
+    COALESCE(p.name, sli.custom_name) AS product_name, u.code AS unit_code,
     sli.quantity_needed, sli.unit_price, sli.unit_price_currency_id,
     c.code AS unit_price_currency_code, c.symbol AS unit_price_currency_symbol,
     sli.is_extra, sli.is_purchased,
@@ -38,9 +39,9 @@ BEGIN
       END,
     2) AS subtotal_in_display_currency
   FROM shopping_list_items sli
-  INNER JOIN products p ON p.id = sli.product_id
-  INNER JOIN units_of_measure u ON u.id = p.unit_id
+  LEFT JOIN products p ON p.id = sli.product_id
+  LEFT JOIN units_of_measure u ON u.id = p.unit_id
   LEFT JOIN currencies c ON c.id = sli.unit_price_currency_id
   WHERE sli.shopping_list_id = p_shopping_list_id
-  ORDER BY sli.is_extra, p.name;
+  ORDER BY sli.is_extra, COALESCE(p.name, sli.custom_name);
 END;

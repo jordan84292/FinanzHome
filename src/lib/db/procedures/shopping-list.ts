@@ -33,9 +33,13 @@ export interface ShoppingListRecord extends RowDataPacket {
 export interface ShoppingListItemRecord extends RowDataPacket {
   id: number;
   shopping_list_id: number;
-  product_id: number;
+  /** NULL for a custom (non-catalog) item added via the "Producto" button — see custom_name. */
+  product_id: number | null;
+  /** Set only for custom items; product_name already falls back to this via COALESCE. */
+  custom_name: string | null;
   product_name: string;
-  unit_code: string;
+  /** NULL for custom items — they have no registered unit of measure. */
+  unit_code: string | null;
   quantity_needed: number;
   unit_price: number | null;
   unit_price_currency_id: number | null;
@@ -92,7 +96,7 @@ export async function getShoppingListItems(
 export async function addShoppingListItem(params: {
   shoppingListId: number;
   householdId: number;
-  productId: number;
+  customName: string;
   quantityNeeded: number;
   unitPrice: number | null;
   unitPriceCurrencyId: number | null;
@@ -101,7 +105,7 @@ export async function addShoppingListItem(params: {
   const rows = await callProcedure<ShoppingListItemRecord>('sp_shopping_list_add_item', [
     params.shoppingListId,
     params.householdId,
-    params.productId,
+    params.customName,
     params.quantityNeeded,
     params.unitPrice,
     params.unitPriceCurrencyId,

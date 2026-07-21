@@ -8,7 +8,6 @@ import {
   type UpdateItemState,
 } from '@/app/compras/actions';
 import { CurrencyAmountInput } from '@/components/CurrencyAmountInput';
-import type { ProductRecord } from '@/lib/db/procedures/products';
 import type { ShoppingListItemRecord } from '@/lib/db/procedures/shopping-list';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
 
@@ -19,13 +18,11 @@ export function ShoppingListItemForm({
   mode,
   shoppingListId,
   item,
-  products,
   currencies,
 }: {
   mode: 'add' | 'edit';
   shoppingListId: number;
   item?: ShoppingListItemRecord;
-  products: ProductRecord[];
   currencies: CurrencyRecord[];
 }) {
   const action = mode === 'add' ? addItemAction : updateItemAction;
@@ -37,14 +34,17 @@ export function ShoppingListItemForm({
         <>
           <input type="hidden" name="shoppingListId" value={shoppingListId} />
           <div>
-            <label htmlFor="productId" className="form-label">Producto</label>
-            <select id="productId" name="productId" className="form-select" required>
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name}
-                </option>
-              ))}
-            </select>
+            <label htmlFor="customName" className="form-label">Producto</label>
+            <input
+              id="customName"
+              name="customName"
+              type="text"
+              maxLength={150}
+              className="form-control"
+              placeholder="Nombre del producto"
+              required
+              autoFocus
+            />
           </div>
         </>
       ) : (

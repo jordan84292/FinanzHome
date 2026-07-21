@@ -18,6 +18,7 @@ BEGIN
   DECLARE v_unit_price DECIMAL(12,2);
   DECLARE v_unit_price_currency_id TINYINT UNSIGNED;
   DECLARE v_product_id INT UNSIGNED;
+  DECLARE v_item_exists INT;
   DECLARE v_rate DECIMAL(12,4);
   DECLARE v_total DECIMAL(12,2) DEFAULT 0;
   DECLARE v_raw JSON;
@@ -71,11 +72,12 @@ BEGIN
     SET v_unit_price_currency_id = IF(JSON_TYPE(v_raw) = 'NULL', NULL, CAST(JSON_UNQUOTE(v_raw) AS UNSIGNED));
 
     SET v_product_id = NULL;
-    SELECT product_id INTO v_product_id
+    SET v_item_exists = 0;
+    SELECT product_id, 1 INTO v_product_id, v_item_exists
     FROM shopping_list_items
     WHERE id = v_item_id AND shopping_list_id = p_shopping_list_id;
 
-    IF v_product_id IS NULL THEN
+    IF v_item_exists = 0 THEN
       SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Item does not belong to this shopping list';
     END IF;
 
@@ -86,9 +88,12 @@ BEGIN
         is_purchased = 1
     WHERE id = v_item_id;
 
-    UPDATE products
-    SET current_quantity = current_quantity + v_quantity
-    WHERE id = v_product_id;
+    -- Custom (non-catalog) items have product_id NULL — nothing to bump.
+    IF v_product_id IS NOT NULL THEN
+      UPDATE products
+      SET current_quantity = current_quantity + v_quantity
+      WHERE id = v_product_id;
+    END IF;
 
     SET v_total = v_total + ROUND(
       v_quantity * IFNULL(v_unit_price, 0) *

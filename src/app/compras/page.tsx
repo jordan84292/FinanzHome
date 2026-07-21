@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { getHouseholdsForUser, listHouseholdMembers } from '@/lib/db/procedures/household';
 import { listCurrencies } from '@/lib/db/procedures/currency';
-import { listProducts } from '@/lib/db/procedures/products';
 import {
   generateOrGetShoppingList,
   getShoppingList,
@@ -25,10 +24,9 @@ export default async function ComprasPage() {
 
   const generated = await generateOrGetShoppingList(membership.id, membership.member_id);
 
-  const [list, items, products, currencies, members] = await Promise.all([
+  const [list, items, currencies, members] = await Promise.all([
     getShoppingList(generated.id, membership.id, DISPLAY_CURRENCY_ID),
     getShoppingListItems(generated.id, membership.id, DISPLAY_CURRENCY_ID),
-    listProducts(membership.id),
     listCurrencies(),
     listHouseholdMembers(membership.id),
   ]);
@@ -39,7 +37,6 @@ export default async function ComprasPage() {
     <ShoppingListClient
       list={list}
       items={items}
-      products={products}
       currencies={currencies}
       displayCurrencySymbol={displayCurrency?.symbol ?? ''}
       members={members}

@@ -7,7 +7,6 @@ import { ShoppingListItemForm } from '@/components/shopping-list/ShoppingListIte
 import { ConfirmPurchaseButton } from './confirm-purchase-button';
 import { SplitPanel } from '@/components/shopping-list/SplitPanel';
 import { useOnlineStatus } from '@/lib/pwa/use-online-status';
-import type { ProductRecord } from '@/lib/db/procedures/products';
 import type { ShoppingListItemRecord, ShoppingListRecord } from '@/lib/db/procedures/shopping-list';
 import type { CurrencyRecord } from '@/lib/db/procedures/currency';
 import type { HouseholdMemberRecord } from '@/lib/db/procedures/household';
@@ -15,7 +14,6 @@ import type { HouseholdMemberRecord } from '@/lib/db/procedures/household';
 export function ShoppingListClient({
   list,
   items,
-  products,
   currencies,
   displayCurrencySymbol,
   members,
@@ -23,7 +21,6 @@ export function ShoppingListClient({
 }: {
   list: ShoppingListRecord;
   items: ShoppingListItemRecord[];
-  products: ProductRecord[];
   currencies: CurrencyRecord[];
   displayCurrencySymbol: string;
   members: HouseholdMemberRecord[];
@@ -126,7 +123,6 @@ export function ShoppingListClient({
               mode={panel.mode}
               shoppingListId={displayList.id}
               item={panel.mode === 'edit' ? panel.item : undefined}
-              products={products}
               currencies={currencies}
             />
           </div>
